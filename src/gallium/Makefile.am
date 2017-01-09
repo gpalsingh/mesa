@@ -153,6 +153,10 @@ if HAVE_ST_OMX_BELLAGIO
 SUBDIRS += state_trackers/omx_bellagio targets/omx-bellagio
 endif
 
+if HAVE_ST_OMX_TIZONIA
+SUBDIRS += state_trackers/omx_tizonia targets/omx-tizonia
+endif
+
 if HAVE_GALLIUM_OSMESA
 SUBDIRS += state_trackers/osmesa targets/osmesa
 endif
