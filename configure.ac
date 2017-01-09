@@ -85,6 +85,7 @@ dnl Versions for external dependencies
 DRI2PROTO_REQUIRED=2.8
 GLPROTO_REQUIRED=1.4.14
 LIBOMXIL_BELLAGIO_REQUIRED=0.0
+LIBOMXIL_TIZONIA_REQUIRED=0.1.0
 LIBVA_REQUIRED=0.38.0
 VDPAU_REQUIRED=1.1
 WAYLAND_REQUIRED=1.11
@@ -1219,6 +1220,11 @@ AC_ARG_ENABLE([omx],
          [enable OpenMAX library @<:@default=disabled@:>@])],
    [enable_omx="$enableval"],
    [enable_omx=no])
+AC_ARG_ENABLE([omx-tizonia],
+   [AS_HELP_STRING([--enable-omx-tizonia],
+         [enable OpenMAX Tizonia library @<:@default=disabled@:>@])],
+   [enable_omx_tizonia="$enableval"],
+   [enable_omx_tizonia=no])
 AC_ARG_ENABLE([va],
    [AS_HELP_STRING([--enable-va],
          [enable va library @<:@default=auto@:>@])],
@@ -1270,6 +1276,7 @@ if test "x$enable_opengl" = xno -a \
         "x$enable_xvmc" = xno -a \
         "x$enable_vdpau" = xno -a \
         "x$enable_omx" = xno -a \
+        "x$enable_omx_tizonia" = xno -a \
         "x$enable_va" = xno -a \
         "x$enable_opencl" = xno; then
     AC_MSG_ERROR([at least one API should be enabled])
@@ -2116,6 +2123,10 @@ if test -n "$with_gallium_drivers" -a "x$with_gallium_drivers" != xswrast; then
         PKG_CHECK_EXISTS([libomxil-bellagio >= $LIBOMXIL_BELLAGIO_REQUIRED], [enable_omx=yes], [enable_omx=no])
     fi
 
+    if test "x$enable_omx_tizonia -a "x$have_omx_platform" = xyes" = xauto; then
+	PKG_CHECK_EXISTS([libtizonia >= $LIBOMXIL_TIZONIA_REQUIRED], [enable_omx_tizonia=yes], [enable_omx_tizonia=no])
+    fi
+
     if test "x$enable_va" = xauto -a "x$have_va_platform" = xyes; then
         PKG_CHECK_EXISTS([libva >= $LIBVA_REQUIRED], [enable_va=yes], [enable_va=no])
     fi
@@ -2166,6 +2177,14 @@ if test "x$enable_omx" = xyes; then
     gallium_st="$gallium_st omx"
 fi
 AM_CONDITIONAL(HAVE_ST_OMX, test "x$enable_omx" = xyes)
+
+if test "x$enable_omx_tizonia" = xyes; then
+    PKG_CHECK_MODULES([OMX_TIZONIA], [libtizonia >= $LIBOMXIL_TIZONIA_REQUIRED])
+    PKG_CHECK_MODULES([OMX_TIZILHEADERS], [tizilheaders >= $LIBOMXIL_TIZONIA_REQUIRED])
+    PKG_CHECK_MODULES([OMX_TIZPLATFORM], [libtizplatform >= $LIBOMXIL_TIZONIA_REQUIRED])
+    gallium_st="$gallium_st omx_tizonia"
+fi
+AM_CONDITIONAL(HAVE_ST_OMX_TIZONIA, test "x$enable_omx_tizonia" = xyes)
 
 if test "x$enable_va" = xyes; then
     if test "x$have_va_platform" != xyes; then
@@ -2336,6 +2355,15 @@ AC_ARG_WITH([omx-libdir],
     [OMX_LIB_INSTALL_DIR=`$PKG_CONFIG --exists libomxil-bellagio && \
                           $PKG_CONFIG --define-variable=libdir=\$libdir --variable=pluginsdir libomxil-bellagio`])
 AC_SUBST([OMX_LIB_INSTALL_DIR])
+
+dnl Directory for OMX_TIZONIA libs
+
+AC_ARG_WITH([omx-tizonia-libdir],
+    [AS_HELP_STRING([--with-omx-tizonia-libdir=DIR],
+        [directory for the OMX_TIZONIA libraries])],
+    [OMX_TIZONIA_LIB_INSTALL_DIR="$withval"],
+    [OMX_TIZONIA_LIB_INSTALL_DIR=`$PKG_CONFIG --define-variable=libdir=\$libdir --variable=pluginsdir libtizcore`])
+AC_SUBST([OMX_TIZONIA_LIB_INSTALL_DIR])
 
 dnl Directory for VA libs
 
@@ -2835,6 +2863,7 @@ AC_CONFIG_FILES([Makefile
                  src/gallium/state_trackers/glx/xlib/Makefile
                  src/gallium/state_trackers/nine/Makefile
                  src/gallium/state_trackers/omx/Makefile
+                 src/gallium/state_trackers/omx_tizonia/Makefile
                  src/gallium/state_trackers/osmesa/Makefile
                  src/gallium/state_trackers/va/Makefile
                  src/gallium/state_trackers/vdpau/Makefile
@@ -2845,6 +2874,7 @@ AC_CONFIG_FILES([Makefile
                  src/gallium/targets/dri/Makefile
                  src/gallium/targets/libgl-xlib/Makefile
                  src/gallium/targets/omx/Makefile
+                 src/gallium/targets/omx-tizonia/Makefile
                  src/gallium/targets/opencl/Makefile
                  src/gallium/targets/opencl/mesa.icd
                  src/gallium/targets/osmesa/Makefile
