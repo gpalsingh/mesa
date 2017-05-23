@@ -2820,7 +2820,7 @@ AC_CONFIG_FILES([Makefile
 		src/gallium/targets/dri/Makefile
 		src/gallium/targets/libgl-xlib/Makefile
 		src/gallium/targets/omx/Makefile
-		src/gallium/targets/omx_tizonia/Makefile
+		src/gallium/targets/omx-tizonia/Makefile
 		src/gallium/targets/opencl/Makefile
 		src/gallium/targets/opencl/mesa.icd
 		src/gallium/targets/osmesa/Makefile
