@@ -14,6 +14,8 @@
 
 #define DPB_MAX_SIZE 5
 
+unsigned dec_frame_delta;
+
 struct dpb_list {
    struct list_head list;
    struct pipe_video_buffer *buffer;
@@ -140,14 +142,36 @@ static void h264d_buffer_filled (h264d_prc_t * p_prc, OMX_BUFFERHEADERTYPE * p_h
     }
 }
 
-static OMX_BUFFERHEADERTYPE * get_input_buffer (h264d_prc_t *p_prc)
-{
-  assert (p_prc);
+static bool h264d_shift_buffers_left(h264d_prc_t * p_prc) {
+    if (--p_prc->num_in_buffers) {
+        p_prc->in_buffers[0] = p_prc->in_buffers[1];
+        p_prc->sizes[0] = p_prc->sizes[1] - dec_frame_delta;
+        p_prc->inputs[0] = p_prc->inputs[1] + dec_frame_delta;
+        p_prc->timestamps[0] = p_prc->timestamps[1];
+
+        return true;
+    }
+    return false;
+}
+
+static OMX_BUFFERHEADERTYPE * get_input_buffer (h264d_prc_t * p_prc) {
+    assert (p_prc);
 
     if (p_prc->in_port_disabled_) {
         return NULL;
     }
 
+    if (p_prc->num_in_buffers > 1) {
+        /* The input buffer wasn't cleared last time. */
+        h264d_buffer_emptied (p_prc, p_prc->in_buffers[0]);
+        if (p_prc->in_buffers[0]) {
+            /* Failed to release buffer */
+            return NULL;
+        }
+        h264d_shift_buffers_left(p_prc);
+    }
+
+    assert (!p_prc->p_inhdr_); /* decode_frame expects new buffers each time */
     tiz_krn_claim_buffer (tiz_get_krn (handleOf (p_prc)),
                           OMX_VID_DEC_AVC_INPUT_PORT_INDEX, 0,
                           &p_prc->p_inhdr_);
@@ -405,14 +429,20 @@ static void seq_parameter_set (h264d_prc_t *p_prc, struct vl_rbsp *rbsp)
     vl_rbsp_u (rbsp, 1);
 
     /* pic_width_in_mbs_minus1 */
-    vl_rbsp_ue (rbsp);
+    int pic_width_in_samplesl = (vl_rbsp_ue (rbsp) + 1) * 16;
+    p_prc->stream_info.width = pic_width_in_samplesl;
 
     /* pic_height_in_map_units_minus1 */
-    vl_rbsp_ue (rbsp);
+    int pic_height_in_map_units = vl_rbsp_ue (rbsp) + 1;
 
     sps->frame_mbs_only_flag = vl_rbsp_u (rbsp, 1);
     if (!sps->frame_mbs_only_flag)
         sps->mb_adaptive_frame_field_flag = vl_rbsp_u (rbsp, 1);
+
+    int frame_height_in_mbs = (2 - sps->frame_mbs_only_flag) * pic_height_in_map_units;
+    int pic_height_in_mbs = frame_height_in_mbs / ( 1 + p_prc->picture.h264.field_pic_flag );
+    int pic_height_in_samplesl = pic_height_in_mbs * 16;
+    p_prc->stream_info.height = pic_height_in_samplesl;
 
     sps->direct_8x8_inference_flag = vl_rbsp_u (rbsp, 1);
 
@@ -434,6 +464,44 @@ static void seq_parameter_set (h264d_prc_t *p_prc, struct vl_rbsp *rbsp)
     /* vui_parameters_present_flag */
     if (vl_rbsp_u (rbsp, 1))
         vui_parameters (rbsp);
+}
+
+static OMX_ERRORTYPE update_port_parameters (h264d_prc_t * p_prc) {
+    OMX_VIDEO_PORTDEFINITIONTYPE * p_def = NULL;    /* Output port info */
+    h264d_stream_info_t * i_def = NULL; /* Info read from stream */
+
+    p_def = &(p_prc->out_port_def_.format.video);
+    i_def = &(p_prc->stream_info);
+
+    unsigned framesize = i_def->width * i_def->height;
+
+    p_prc->in_port_def_.nBufferSize = framesize * 512 / (16*16);
+
+    tiz_check_omx (tiz_krn_SetParameter_internal (
+        tiz_get_krn (handleOf (p_prc)), handleOf (p_prc),
+        OMX_IndexParamPortDefinition, &(p_prc->in_port_def_)));
+
+    tiz_srv_issue_event ((OMX_PTR) p_prc, OMX_EventPortSettingsChanged,
+                          OMX_VID_DEC_AVC_INPUT_PORT_INDEX,
+                          OMX_IndexParamPortDefinition,
+                          NULL);
+
+    p_def->nFrameWidth = i_def->width;
+    p_def->nFrameHeight = i_def->height;
+    p_def->nStride = i_def->width;
+        p_def->nSliceHeight = i_def->height;
+    p_prc->out_port_def_.nBufferSize = framesize*3/2;
+
+    tiz_check_omx (tiz_krn_SetParameter_internal (
+        tiz_get_krn (handleOf (p_prc)), handleOf (p_prc),
+        OMX_IndexParamPortDefinition, &(p_prc->out_port_def_)));
+
+    tiz_srv_issue_event ((OMX_PTR) p_prc, OMX_EventPortSettingsChanged,
+                          OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX,
+                          OMX_IndexParamPortDefinition,
+                          NULL);
+
+    return OMX_ErrorNone;
 }
 
 static void picture_parameter_set (h264d_prc_t *p_prc, struct vl_rbsp *rbsp)
@@ -1119,6 +1187,7 @@ static void decode_buffer (h264d_prc_t *p_prc, struct vl_vlc *vlc, unsigned min_
         struct vl_rbsp rbsp;
         vl_rbsp_init (&rbsp, vlc, ~0);
         seq_parameter_set (p_prc, &rbsp);
+        update_port_parameters (p_prc);
 
     } else if (nal_unit_type == 8) {
         struct vl_rbsp rbsp;
@@ -1161,6 +1230,10 @@ static void decode_buffer (h264d_prc_t *p_prc, struct vl_vlc *vlc, unsigned min_
 static void reset_stream_parameters (h264d_prc_t * ap_prc)
 {
     assert (ap_prc);
+    TIZ_INIT_OMX_PORT_STRUCT (ap_prc->in_port_def_,
+                              OMX_VID_DEC_AVC_INPUT_PORT_INDEX);
+    TIZ_INIT_OMX_PORT_STRUCT (ap_prc->out_port_def_,
+                              OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX);
     ap_prc->p_inhdr_ = 0;
     ap_prc->num_in_buffers = 0;
     ap_prc->p_outhdr_ = 0;
@@ -1168,6 +1241,7 @@ static void reset_stream_parameters (h264d_prc_t * ap_prc)
     ap_prc->eos_ = false;
     ap_prc->frame_finished = false;
     ap_prc->frame_started = false;
+    ap_prc->picture.h264.field_order_cnt[0] = ap_prc->picture.h264.field_order_cnt[1] = INT_MAX;
 }
 
 static void h264d_deint (h264d_prc_t *p_prc, struct pipe_video_buffer *src_buf,
@@ -1299,7 +1373,7 @@ static void h264d_manage_buffers(h264d_prc_t* p_prc) {
 
     /* Realase output buffer if filled or eos
        Keep if two input buffers are being decoded */
-    if (!next_is_eos && ((p_prc->p_outhdr_->nFilledLen > 0) || p_prc->eos_)) {
+    if ((!next_is_eos) && ((p_prc->p_outhdr_->nFilledLen > 0) || p_prc->eos_)) {
         h264d_buffer_filled(p_prc, p_prc->p_outhdr_);
     }
 
@@ -1359,14 +1433,19 @@ static OMX_ERRORTYPE decode_frame(h264d_prc_t *p_prc,
             h264d_buffer_emptied(p_prc, p_prc->in_buffers[0]);
         }
 
-        if (--p_prc->num_in_buffers) {
-            unsigned delta = MIN2((min_bits_left - vl_vlc_bits_left(&vlc)) / 8, p_prc->sizes[1]);
-
-            p_prc->in_buffers[0] = p_prc->in_buffers[1];
-            p_prc->sizes[0] = p_prc->sizes[1] - delta;
-            p_prc->inputs[0] = p_prc->inputs[1] + delta;
-            p_prc->timestamps[0] = p_prc->timestamps[1];
+        if (p_prc->out_port_disabled_) {
+            /* In case out port is disabled, h264d_buffer_emptied will fail to release input port.
+             * We need to wait before shifting the buffers in that case and check in
+             * get_input_buffer when out port is enabled to release and shift the buffers.
+             * Infinite looping occurs if buffer is not released */
+            if (p_prc->num_in_buffers == 2) {
+                /* Set the delta value for use in get_input_buffer before exiting */
+                dec_frame_delta = MIN2((min_bits_left - vl_vlc_bits_left(&vlc)) / 8, p_prc->sizes[1]);
+            }
+            break;
         }
+
+        h264d_shift_buffers_left(p_prc);
     }
 
     return OMX_ErrorNone;
@@ -1427,9 +1506,7 @@ static OMX_ERRORTYPE h264d_prc_allocate_resources (void *ap_obj, OMX_U32 a_pid)
         return OMX_ErrorInsufficientResources;
     }
 
-    p_prc->picture.base.profile = PIPE_VIDEO_PROFILE_MPEG4_AVC_HIGH;
     LIST_INITHEAD (&p_prc->codec_data.dpb_list);
-    p_prc->picture.h264.field_order_cnt[0] = p_prc->picture.h264.field_order_cnt[1] = INT_MAX;
 
     return OMX_ErrorNone;
 }
@@ -1455,6 +1532,19 @@ static OMX_ERRORTYPE h264d_prc_prepare_to_transfer (void *ap_obj, OMX_U32 a_pid)
 {
     h264d_prc_t *p_prc = ap_obj;
     assert (p_prc);
+
+    TIZ_INIT_OMX_PORT_STRUCT (p_prc->in_port_def_,
+                              OMX_VID_DEC_AVC_INPUT_PORT_INDEX);
+    tiz_check_omx (
+        tiz_api_GetParameter (tiz_get_krn (handleOf (p_prc)), handleOf (p_prc),
+                              OMX_IndexParamPortDefinition, &(p_prc->in_port_def_)));
+
+    TIZ_INIT_OMX_PORT_STRUCT (p_prc->out_port_def_,
+                              OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX);
+    tiz_check_omx (
+        tiz_api_GetParameter (tiz_get_krn (handleOf (p_prc)), handleOf (p_prc),
+                              OMX_IndexParamPortDefinition, &(p_prc->out_port_def_)));
+
     p_prc->first_buf_in_frame= true;
     p_prc->eos_       = false;
     return OMX_ErrorNone;
@@ -1475,8 +1565,13 @@ static OMX_ERRORTYPE h264d_prc_buffers_ready (const void *ap_obj)
 {
     assert(p_prc);
     h264d_prc_t *p_prc = (h264d_prc_t *) ap_obj;
-    OMX_BUFFERHEADERTYPE *in_buf;
-    OMX_BUFFERHEADERTYPE *out_buf;
+    OMX_BUFFERHEADERTYPE *in_buf = NULL;
+    OMX_BUFFERHEADERTYPE *out_buf = NULL;
+
+    /* Set parameters if start of stream */
+    if (!p_prc->eos_ && p_prc->first_buf_in_frame && (in_buf = get_input_buffer(p_prc))) {
+        decode_frame(p_prc, in_buf);
+    }
 
     /* Don't get input buffer if output buffer not found */
     while (!p_prc->eos_ && (out_buf = get_output_buffer(p_prc)) && (in_buf = get_input_buffer(p_prc))) {

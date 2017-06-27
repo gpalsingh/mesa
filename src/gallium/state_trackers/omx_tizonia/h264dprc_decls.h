@@ -22,6 +22,13 @@ struct h264d_prc_class
     /* NOTE: Class methods might be added in the future */
 };
 
+typedef struct h264d_stream_info h264d_stream_info_t;
+struct h264d_stream_info
+{
+  unsigned int width;
+  unsigned int height;
+};
+
 typedef struct h264d_prc h264d_prc_t;
 struct h264d_prc
 {
@@ -30,6 +37,8 @@ struct h264d_prc
     OMX_BUFFERHEADERTYPE *in_buffers[2];
     OMX_BUFFERHEADERTYPE *p_inhdr_;
     OMX_BUFFERHEADERTYPE *p_outhdr_;
+    OMX_PARAM_PORTDEFINITIONTYPE in_port_def_;
+    OMX_PARAM_PORTDEFINITIONTYPE out_port_def_;
     const void *inputs[2];
     unsigned sizes[2];
     OMX_TICKS timestamps[2];
@@ -60,6 +69,7 @@ struct h264d_prc
         struct pipe_picture_desc base;
         struct pipe_h264_picture_desc h264;
     } picture;
+    h264d_stream_info_t stream_info;
     unsigned num_in_buffers;
     bool first_buf_in_frame;
     bool frame_finished;
