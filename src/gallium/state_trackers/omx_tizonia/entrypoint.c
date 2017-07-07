@@ -63,6 +63,8 @@ static OMX_BOOL egl_image_validation_hook (const OMX_HANDLETYPE ap_hdl,
 /*         return OMX_FALSE; */
 /*       } */
 /*   } */
+    
+    printf("Got EGLImage in egl_image_validation_hook: [%p]\n", ap_eglimage);
 
     /* This function must return true or false */
     return OMX_TRUE;
