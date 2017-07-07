@@ -203,6 +203,17 @@ static OMX_BUFFERHEADERTYPE * get_output_buffer (h264d_prc_t * p_prc) {
                     p_prc->p_outhdr_ = NULL;
                 }
                 printf("Got EGLImage in get_output_buffer: [%p]\n", p_eglimage);
+                const tiz_port_t * p_port = NULL;
+                p_port = tiz_krn_get_port (tiz_get_krn (handleOf (p_prc)), OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX);
+                printf("Out port (p_prc) pNativeWindow in get_output_buffer: [%p]\n",
+                        p_prc->out_port_def_.format.video.pNativeWindow);
+                printf("Out port pNativeWindow in get_output_buffer: [%p]\n",
+                        p_port->portdef_.format.video.pNativeWindow);
+                p_port = tiz_krn_get_port (tiz_get_krn (handleOf (p_prc)), OMX_VID_DEC_AVC_INPUT_PORT_INDEX);
+                printf("In port (p_prc) pNativeWindow in get_output_buffer: [%p]\n",
+                        p_prc->in_port_def_.format.video.pNativeWindow);
+                printf("In port pNativeWindow in get_output_buffer: [%p]\n",
+                        p_port->portdef_.format.video.pNativeWindow);
             }
         }
     }
