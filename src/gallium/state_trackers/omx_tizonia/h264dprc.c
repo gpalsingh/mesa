@@ -186,9 +186,24 @@ static OMX_BUFFERHEADERTYPE * get_output_buffer (h264d_prc_t * p_prc) {
     }
 
     if (!p_prc->p_outhdr_) {
-        tiz_krn_claim_buffer (tiz_get_krn (handleOf (p_prc)),
-                              OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX, 0,
-                              &p_prc->p_outhdr_);
+        if (OMX_ErrorNone
+            == tiz_krn_claim_buffer (tiz_get_krn (handleOf (p_prc)),
+                                     OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX, 0,
+                                     &p_prc->p_outhdr_)) {
+            if (p_prc->p_outhdr_) {
+                OMX_PTR p_eglimage = NULL;
+                /* Check pBuffer nullity to know if an eglimage have been registered. */
+                if (!p_prc->p_outhdr_->pBuffer &&
+                    OMX_ErrorNone == tiz_krn_claim_eglimage (tiz_get_krn (handleOf (p_prc)),
+                                                             OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX,
+                                                             p_prc->p_outhdr_, &p_eglimage)) {
+                    (void) tiz_krn_release_buffer (tiz_get_krn (handleOf (p_prc)),
+                                                   OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX,
+                                                   p_prc->p_outhdr_);
+                    p_prc->p_outhdr_ = NULL;
+                }
+            }
+        }
     }
     return p_prc->p_outhdr_;
 }
