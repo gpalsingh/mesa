@@ -202,6 +202,7 @@ static OMX_BUFFERHEADERTYPE * get_output_buffer (h264d_prc_t * p_prc) {
                                                    p_prc->p_outhdr_);
                     p_prc->p_outhdr_ = NULL;
                 }
+                printf("Got EGLImage in get_output_buffer: [%p]\n", p_eglimage);
             }
         }
     }
