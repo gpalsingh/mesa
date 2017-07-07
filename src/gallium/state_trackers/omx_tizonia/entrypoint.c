@@ -54,17 +54,15 @@ static OMX_BOOL egl_image_validation_hook (const OMX_HANDLETYPE ap_hdl,
 
     assert (p_videoport);
 
-/*   { */
-/*     const OMX_VIDEO_PORTDEFINITIONTYPE * p_video_portdef */
-/*       = &(p_port->portdef_.format.video); */
+    const OMX_VIDEO_PORTDEFINITIONTYPE * p_video_portdef
+       = &(p_port->portdef_.format.video);
 
-/*     if (!p_video_portdef->pNativeWindow) */
-/*       { */
-/*         return OMX_FALSE; */
-/*       } */
-/*   } */
-    
+    if (!p_video_portdef->pNativeWindow) {
+        return OMX_FALSE;
+    }
+
     printf("Got EGLImage in egl_image_validation_hook: [%p]\n", ap_eglimage);
+    printf("Got pNativeWindow in egl_image_validation_hook: [%p]\n", p_video_portdef->pNativeWindow);
 
     /* This function must return true or false */
     return OMX_TRUE;
