@@ -5,5 +5,19 @@ C_SOURCES := \
 	h264d.h \
 	h264dprc.c \
 	h264dprc.h \
-	h264prc_decls.h
-
+	h264dprc_decls.h \
+	h264e.c \
+	h264e.h \
+	h264eprc.c \
+	h264eprc.h \
+	h264eprc_decls.h \
+	h264einport.h \
+	h264einport.c \
+	h264einport_decls.h \
+	h264einport.h \
+	h264eoutport.c \
+	h264eoutport_decls.h \
+	h264eoutport.h \
+	names.h \
+	h264e_common.h \
+	h264e_common.c
