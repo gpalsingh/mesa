@@ -2,6 +2,7 @@
 
 #include "h264dprc.h"
 #include "h264d.h"
+#include "names.h"
 
 static OMX_VERSIONTYPE h264_decoder_version = {{0, 0, 0, 1}};
 
@@ -139,7 +140,7 @@ OMX_PTR instantiate_h264_config_port (OMX_HANDLETYPE ap_hdl)
 {
     return factory_new (tiz_get_type (ap_hdl, "tizconfigport"),
                       NULL, /* this port does not take options */
-                      OMX_VID_DEC_AVC_NAME, h264_decoder_version);
+                      OMX_VID_COMP_NAME, h264_decoder_version);
 }
 
 OMX_PTR instantiate_h264_processor (OMX_HANDLETYPE ap_hdl)
