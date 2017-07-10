@@ -1482,8 +1482,7 @@ static OMX_ERRORTYPE decode_frame(h264d_prc_t *p_prc,
  * h264dprc
  */
 
-static void *
-h264d_prc_ctor (void *ap_obj, va_list * app)
+static void * h264d_prc_ctor (void *ap_obj, va_list * app)
 {
     h264d_prc_t *p_prc = super_ctor (typeOf (ap_obj, "h264dprc"), ap_obj, app);
     assert (p_prc);
@@ -1512,9 +1511,12 @@ static OMX_ERRORTYPE h264d_prc_allocate_resources (void *ap_obj, OMX_U32 a_pid)
     h264d_prc_t *p_prc = ap_obj;
     struct pipe_screen *screen;
 
-    p_prc->screen       = omx_get_screen ();
+    assert (p_prc);
+
+    p_prc->screen = omx_get_screen ();
     if (!p_prc->screen)
         return OMX_ErrorInsufficientResources;
+
     screen = p_prc->screen->pscreen;
     p_prc->pipe = screen->context_create (screen, p_prc->screen, 0);
     if (!p_prc->pipe)
