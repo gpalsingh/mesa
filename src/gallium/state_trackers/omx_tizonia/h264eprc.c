@@ -97,11 +97,9 @@ static unsigned enc_TranslateOMXLevelToPipe(unsigned omx_level)
 static OMX_BUFFERHEADERTYPE * get_input_buffer (h264e_prc_t * p_prc) {
     assert (p_prc);
 
-    /*
     if (p_prc->in_port_disabled_) {
         return NULL;
     }
-    */
 
     assert (!p_prc->p_inhdr_); /* encode_frame expects new buffers every time */
 
@@ -114,11 +112,9 @@ static OMX_BUFFERHEADERTYPE * get_input_buffer (h264e_prc_t * p_prc) {
 static OMX_BUFFERHEADERTYPE * get_output_buffer (h264e_prc_t * p_prc) {
     assert (p_prc);
 
-    /*
     if (p_prc->out_port_disabled_) {
         return NULL;
     }
-    */
 
     if (!p_prc->p_outhdr_) {
         tiz_krn_claim_buffer (tiz_get_krn (handleOf (p_prc)),
@@ -135,7 +131,7 @@ static OMX_ERRORTYPE h264e_buffer_emptied (h264e_prc_t * p_prc, OMX_BUFFERHEADER
     assert (p_prc);
     assert (p_prc->p_inhdr_ == p_hdr);
 
-    /* if (!p_prc->out_port_disabled_) { */
+    if (!p_prc->out_port_disabled_) {
         assert (p_hdr->nFilledLen == 0);
         p_hdr->nOffset = 0;
 
@@ -145,7 +141,7 @@ static OMX_ERRORTYPE h264e_buffer_emptied (h264e_prc_t * p_prc, OMX_BUFFERHEADER
 
         r = tiz_krn_release_buffer (tiz_get_krn (handleOf (p_prc)), 0, p_hdr);
         p_prc->p_inhdr_ = NULL;
-    /* } */
+    }
 
     return r;
 }
@@ -158,30 +154,27 @@ static OMX_ERRORTYPE h264e_buffer_filled (h264e_prc_t * p_prc, OMX_BUFFERHEADERT
     assert (p_prc->p_outhdr_ == p_hdr);
     assert (p_hdr);
 
-    /* if (!p_prc->in_port_disabled_) { */
+    if (!p_prc->in_port_disabled_) {
         p_hdr->nOffset = 0;
 
         if (p_prc->eos_) {
             /* EOS has been received and all the input data has been consumed
              * already, so its time to propagate the EOS flag */
             p_prc->p_outhdr_->nFlags |= OMX_BUFFERFLAG_EOS;
-            //p_prc->eos_ = false;
         }
 
         r = tiz_krn_release_buffer (tiz_get_krn (handleOf (p_prc)),
                                     OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX,
                                     p_hdr);
         p_prc->p_outhdr_ = NULL;
-    /* } */
+    }
 
     return r;
 }
 
 
 static void release_input_header (h264e_prc_t * p_prc) {
-    /*
     assert(!p_prc->in_port_disabled_);
-    */
     if (p_prc->p_inhdr_) {
         (void) tiz_krn_release_buffer (tiz_get_krn (handleOf (p_prc)),
                                        OMX_VID_ENC_AVC_INPUT_PORT_INDEX,
@@ -192,7 +185,7 @@ static void release_input_header (h264e_prc_t * p_prc) {
 
 static void release_output_header (h264e_prc_t * p_prc) {
     if (p_prc->p_outhdr_) {
-        /* assert(!p_prc->out_port_disabled_); */
+        assert(!p_prc->out_port_disabled_);
         (void) tiz_krn_release_buffer (tiz_get_krn (handleOf (p_prc)),
                                        OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX,
                                        p_prc->p_outhdr_);
@@ -690,8 +683,8 @@ h264e_prc_ctor (void *ap_obj, va_list * app)
     p_prc->restricted_b_frames = debug_get_bool_option("OMX_USE_RESTRICTED_B_FRAMES", FALSE);
     p_prc->scale.xWidth = OMX_VID_ENC_SCALING_WIDTH_DEFAULT;
     p_prc->scale.xHeight = OMX_VID_ENC_SCALING_WIDTH_DEFAULT;
-    //p_prc->in_port_disabled_    = false;
-    //p_prc->out_port_disabled_   = false;
+    p_prc->in_port_disabled_    = false;
+    p_prc->out_port_disabled_   = false;
     reset_stream_parameters(p_prc);
 
     return p_prc;
@@ -817,9 +810,6 @@ static OMX_ERRORTYPE h264e_prc_prepare_to_transfer (void *ap_obj, OMX_U32 a_pid)
         tiz_api_GetParameter (p_krn, handleOf (p_prc),
                               OMX_IndexParamVideoProfileLevelCurrent, &(p_prc->profile_level)));
 
-    /*
-    p_prc->first_buf_in_frame= true;
-    */
     p_prc->eos_ = false;
 
     /* from vid_enc_MessageHandler */
@@ -870,18 +860,11 @@ static OMX_ERRORTYPE h264e_prc_buffers_ready (const void *ap_obj)
     OMX_BUFFERHEADERTYPE *out_buf = NULL;
     OMX_ERRORTYPE r = OMX_ErrorNone;
 
-    /* Set parameters if start of stream
-    if (!p_prc->eos_ && p_prc->first_buf_in_frame && (in_buf = get_input_buffer(p_prc))) {
-        decode_frame(p_prc, in_buf);
-    }
-    */
-
     /* Don't get input buffer if output buffer not found */
-    //while ((out_buf = get_output_buffer(p_prc)) && (in_buf = get_input_buffer(p_prc))) {
     while (!p_prc->eos_ && (out_buf = get_output_buffer(p_prc)) && (in_buf = get_input_buffer(p_prc))) {
-        /* if (!p_prc->out_port_disabled_) { */
-            r = encode_frame(p_prc, in_buf);
-        /* } */
+        if (!p_prc->out_port_disabled_) {
+           r = encode_frame(p_prc, in_buf);
+        }
     }
 
     return r;
@@ -904,16 +887,16 @@ static OMX_ERRORTYPE h264e_prc_port_disable (const void *ap_obj, OMX_U32 a_pid)
 {
     h264e_prc_t *p_prc = (h264e_prc_t *) ap_obj;
     assert (p_prc);
-    //if (OMX_ALL == a_pid || OMX_VID_ENC_AVC_INPUT_PORT_INDEX == a_pid) {
-        ///* Release all buffers */
-        //h264e_release_all_headers (p_prc);
-        //reset_stream_parameters(p_prc);
-        //p_prc->in_port_disabled_ = true;
-    //}
-    //if (OMX_ALL == a_pid || OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX == a_pid) {
-        //release_output_header (p_prc);
-        //p_prc->out_port_disabled_ = true;
-    //}
+    if (OMX_ALL == a_pid || OMX_VID_ENC_AVC_INPUT_PORT_INDEX == a_pid) {
+        /* Release all buffers */
+        h264e_release_all_headers (p_prc);
+        reset_stream_parameters(p_prc);
+        p_prc->in_port_disabled_ = true;
+    }
+    if (OMX_ALL == a_pid || OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX == a_pid) {
+        release_output_header (p_prc);
+        p_prc->out_port_disabled_ = true;
+    }
     return OMX_ErrorNone;
 }
 
@@ -921,7 +904,6 @@ static OMX_ERRORTYPE h264e_prc_port_enable (const void *ap_obj, OMX_U32 a_pid)
 {
     h264e_prc_t * p_prc = (h264e_prc_t *) ap_obj;
     assert (p_prc);
-    /*
     if (OMX_ALL == a_pid || OMX_VID_ENC_AVC_INPUT_PORT_INDEX == a_pid) {
         if (p_prc->in_port_disabled_) {
             reset_stream_parameters (p_prc);
@@ -931,7 +913,6 @@ static OMX_ERRORTYPE h264e_prc_port_enable (const void *ap_obj, OMX_U32 a_pid)
     if (OMX_ALL == a_pid || OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX == a_pid) {
         p_prc->out_port_disabled_ = false;
     }
-    */
     return OMX_ErrorNone;
 }
 
