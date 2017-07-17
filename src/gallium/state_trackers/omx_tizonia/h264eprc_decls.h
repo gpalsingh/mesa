@@ -63,6 +63,8 @@ struct h264e_prc
     OMX_U32 current_scale_buffer;
     OMX_U32 stacked_frames_num;
     bool eos_;
+    bool in_port_disabled_;
+    bool out_port_disabled_;
 };
 
 #endif
