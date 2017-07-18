@@ -191,6 +191,7 @@ static OMX_ERRORTYPE h264e_buffer_filled (h264e_prc_t * p_prc, OMX_BUFFERHEADERT
 
     assert (p_prc);
     assert (p_prc->p_outhdr_ == p_hdr);
+    assert (p_hdr);
 
     if (!p_prc->in_port_disabled_) {
         p_hdr->nOffset = 0;
