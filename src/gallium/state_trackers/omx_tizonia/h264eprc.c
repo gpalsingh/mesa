@@ -94,6 +94,45 @@ static unsigned enc_TranslateOMXLevelToPipe(unsigned omx_level)
 
 /* H264e spefific */
 
+static OMX_ERRORTYPE init_port_structs (h264e_prc_t * p_prc) {
+    const void * p_krn = NULL;
+
+    assert (p_prc);
+
+    /* Initialisation */
+    TIZ_INIT_OMX_PORT_STRUCT (p_prc->in_port_def_,
+                              OMX_VID_ENC_AVC_INPUT_PORT_INDEX);
+    TIZ_INIT_OMX_PORT_STRUCT (p_prc->out_port_def_,
+                              OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX);
+    TIZ_INIT_OMX_PORT_STRUCT (p_prc->bitrate,
+                              OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX);
+    TIZ_INIT_OMX_PORT_STRUCT (p_prc->quant,
+                              OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX);
+    TIZ_INIT_OMX_PORT_STRUCT (p_prc->profile_level,
+                              OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX);
+
+    /* Get values */
+    p_krn = tiz_get_krn (handleOf (p_prc));
+
+    tiz_check_omx (
+        tiz_api_GetParameter (p_krn, handleOf (p_prc),
+                              OMX_IndexParamPortDefinition, &(p_prc->in_port_def_)));
+    tiz_check_omx (
+        tiz_api_GetParameter (p_krn, handleOf (p_prc),
+                              OMX_IndexParamPortDefinition, &(p_prc->out_port_def_)));
+    tiz_check_omx (
+        tiz_api_GetParameter (p_krn, handleOf (p_prc),
+                              OMX_IndexParamVideoBitrate, &(p_prc->bitrate)));
+    tiz_check_omx (
+        tiz_api_GetParameter (p_krn, handleOf (p_prc),
+                              OMX_IndexParamVideoQuantization, &(p_prc->quant)));
+    tiz_check_omx (
+        tiz_api_GetParameter (p_krn, handleOf (p_prc),
+                              OMX_IndexParamVideoProfileLevelCurrent, &(p_prc->profile_level)));
+
+    return OMX_ErrorNone;
+}
+
 static OMX_BUFFERHEADERTYPE * get_input_buffer (h264e_prc_t * p_prc) {
     assert (p_prc);
 
@@ -202,23 +241,14 @@ static OMX_ERRORTYPE h264e_release_all_headers (h264e_prc_t * p_prc)
     return OMX_ErrorNone;
 }
 
-static void reset_stream_parameters (h264e_prc_t * ap_prc)
+static void reset_stream_parameters (h264e_prc_t * p_prc)
 {
-    assert (ap_prc);
-    TIZ_INIT_OMX_PORT_STRUCT (ap_prc->in_port_def_,
-                              OMX_VID_ENC_AVC_INPUT_PORT_INDEX);
-    TIZ_INIT_OMX_PORT_STRUCT (ap_prc->out_port_def_,
-                              OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX);
-    TIZ_INIT_OMX_PORT_STRUCT (ap_prc->bitrate,
-                              OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX);
-    TIZ_INIT_OMX_PORT_STRUCT (ap_prc->quant,
-                              OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX);
-    TIZ_INIT_OMX_PORT_STRUCT (ap_prc->profile_level,
-                              OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX);
-    ap_prc->p_inhdr_ = 0;
-    ap_prc->p_outhdr_ = 0;
+    assert (p_prc);
+    init_port_structs (p_prc);
+    p_prc->p_inhdr_ = 0;
+    p_prc->p_outhdr_ = 0;
     /* Check if need to clear resources to reset current_scale_buffer and others */
-    ap_prc->eos_ = false;
+    p_prc->eos_ = false;
 }
 
 static void h264e_buffer_encoded (h264e_prc_t * p_prc, OMX_BUFFERHEADERTYPE* input, OMX_BUFFERHEADERTYPE* output)
@@ -773,41 +803,10 @@ static OMX_ERRORTYPE h264e_prc_deallocate_resources (void *ap_obj)
 static OMX_ERRORTYPE h264e_prc_prepare_to_transfer (void *ap_obj, OMX_U32 a_pid)
 {
     h264e_prc_t *p_prc = ap_obj;
-    const void * p_krn = NULL;
 
     assert (p_prc);
 
-    p_krn = tiz_get_krn (handleOf (p_prc));
-
-    TIZ_INIT_OMX_PORT_STRUCT (p_prc->in_port_def_,
-                              OMX_VID_ENC_AVC_INPUT_PORT_INDEX);
-    tiz_check_omx (
-        tiz_api_GetParameter (p_krn, handleOf (p_prc),
-                              OMX_IndexParamPortDefinition, &(p_prc->in_port_def_)));
-
-    TIZ_INIT_OMX_PORT_STRUCT (p_prc->out_port_def_,
-                              OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX);
-    tiz_check_omx (
-        tiz_api_GetParameter (p_krn, handleOf (p_prc),
-                              OMX_IndexParamPortDefinition, &(p_prc->out_port_def_)));
-
-    TIZ_INIT_OMX_PORT_STRUCT (p_prc->bitrate,
-                              OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX);
-    tiz_check_omx (
-        tiz_api_GetParameter (p_krn, handleOf (p_prc),
-                              OMX_IndexParamVideoBitrate, &(p_prc->bitrate)));
-
-    TIZ_INIT_OMX_PORT_STRUCT (p_prc->quant,
-                              OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX);
-    tiz_check_omx (
-        tiz_api_GetParameter (p_krn, handleOf (p_prc),
-                              OMX_IndexParamVideoQuantization, &(p_prc->quant)));
-
-    TIZ_INIT_OMX_PORT_STRUCT (p_prc->profile_level,
-                              OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX);
-    tiz_check_omx (
-        tiz_api_GetParameter (p_krn, handleOf (p_prc),
-                              OMX_IndexParamVideoProfileLevelCurrent, &(p_prc->profile_level)));
+    init_port_structs (p_prc);
 
     p_prc->eos_ = false;
 
