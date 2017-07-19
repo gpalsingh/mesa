@@ -260,12 +260,6 @@ static void h264e_buffer_encoded (h264e_prc_t * p_prc, OMX_BUFFERHEADERTYPE* inp
    struct pipe_box box = {};
    unsigned size;
 
-   if (!inp || LIST_IS_EMPTY(&inp->tasks)) {
-      input->nFilledLen = 0; /* mark buffer as empty */
-      enc_MoveTasks(&p_prc->used_tasks, &inp->tasks);
-      return;
-   }
-
    task = LIST_ENTRY(struct encode_task, inp->tasks.next, list);
    LIST_DEL(&task->list);
    LIST_ADDTAIL(&task->list, &p_prc->used_tasks);
@@ -296,10 +290,11 @@ static void h264e_buffer_encoded (h264e_prc_t * p_prc, OMX_BUFFERHEADERTYPE* inp
    output->nOffset = 0;
    output->nFilledLen = size; /* mark buffer as full */
 
-   input->nFilledLen = 0; /* set input buffer for clearing */
-
    /* all output buffers contain exactly one frame */
    output->nFlags = OMX_BUFFERFLAG_ENDOFFRAME;
+
+   input->nFilledLen = 0; /* mark buffer as empty */
+   enc_MoveTasks(&p_prc->used_tasks, &inp->tasks);
 }
 
 /* Replacement for bellagio's omx_base_filter_BufferMgmtFunction */
