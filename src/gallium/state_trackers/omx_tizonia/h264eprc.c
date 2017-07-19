@@ -140,11 +140,12 @@ static OMX_BUFFERHEADERTYPE * get_input_buffer (h264e_prc_t * p_prc) {
         return NULL;
     }
 
-    assert (!p_prc->p_inhdr_); /* encode_frame expects new buffers every time */
+    assert (!p_prc->p_inhdr_);
 
     tiz_krn_claim_buffer (tiz_get_krn (handleOf (p_prc)),
                           OMX_VID_ENC_AVC_INPUT_PORT_INDEX, 0,
                           &p_prc->p_inhdr_);
+
     return p_prc->p_inhdr_;
 }
 
@@ -296,8 +297,6 @@ static void h264e_buffer_encoded (h264e_prc_t * p_prc, OMX_BUFFERHEADERTYPE* inp
    output->nOffset = 0;
    output->nFilledLen = size; /* mark buffer as full */
 
-   input->nFilledLen = 0; /* set input buffer for clearing */
-
    /* all output buffers contain exactly one frame */
    output->nFlags = OMX_BUFFERFLAG_ENDOFFRAME;
 }
@@ -308,13 +307,13 @@ static OMX_ERRORTYPE h264e_manage_buffers(h264e_prc_t* p_prc) {
     OMX_BUFFERHEADERTYPE * out_buf = p_prc->p_outhdr_;
     OMX_ERRORTYPE r = OMX_ErrorNone;
 
+    out_buf->nTimeStamp = in_buf->nTimeStamp;
+
     if (in_buf->nFilledLen > 0) {
         h264e_buffer_encoded (p_prc, in_buf, out_buf);
     } else {
         in_buf->nFilledLen = 0;
     }
-
-    out_buf->nTimeStamp = in_buf->nTimeStamp;
 
     /* Release input buffer if possible */
     if (in_buf->nFilledLen == 0) {
@@ -858,6 +857,18 @@ static OMX_ERRORTYPE h264e_prc_buffers_ready (const void *ap_obj)
     OMX_BUFFERHEADERTYPE *in_buf = NULL;
     OMX_BUFFERHEADERTYPE *out_buf = NULL;
     OMX_ERRORTYPE r = OMX_ErrorNone;
+
+    /* There might be some tasks left in input header */
+    while (p_prc->p_inhdr_ && (out_buf = get_output_buffer (p_prc))) {
+        h264e_manage_buffers (p_prc);
+    }
+    /* Repeat the process until we get rid of the input buffer */
+    if (p_prc->p_inhdr_) {
+        if (p_prc->eos_) {
+            h264e_buffer_emptied (p_prc, p_prc->p_inhdr_);
+        }
+        return r;
+    }
 
     /* Don't get input buffer if output buffer not found */
     while (!p_prc->eos_ && (out_buf = get_output_buffer(p_prc)) && (in_buf = get_input_buffer(p_prc))) {
