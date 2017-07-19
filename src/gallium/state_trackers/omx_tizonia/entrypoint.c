@@ -38,6 +38,8 @@ static unsigned omx_usecount = 0;
 static const char *omx_render_node = NULL;
 static int drm_fd;
 
+DEBUG_GET_ONCE_BOOL_OPTION(mesa_enable_omx_eglimage, "MESA_ENABLE_OMX_EGLIMAGE", false)
+
 static OMX_BOOL egl_image_validation_hook (const OMX_HANDLETYPE ap_hdl,
                                            OMX_U32 pid, OMX_PTR ap_eglimage,
                                            void *ap_args)
@@ -52,6 +54,10 @@ static OMX_BOOL egl_image_validation_hook (const OMX_HANDLETYPE ap_hdl,
     assert (ap_hdl);
     assert (ap_eglimage);
     assert (!ap_args);
+
+    if (!debug_get_option_mesa_enable_omx_eglimage()) {
+        return OMX_FALSE;
+    }
 
     p_krn = tiz_get_krn (ap_hdl);
     p_port = tiz_krn_get_port (p_krn, pid);
