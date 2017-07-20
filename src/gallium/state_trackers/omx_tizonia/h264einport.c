@@ -75,8 +75,8 @@ static OMX_ERRORTYPE h264e_inport_AllocateBuffer (const void * ap_obj, OMX_HANDL
    h264e_inport_t * p_obj = (h264e_inport_t *) ap_obj;
    OMX_ERRORTYPE r;
 
-   r = super_AllocateBuffer(typeOf (ap_obj, "h264einport"), ap_obj, ap_hdl,
-                            buf, idx, private, size);
+   r = super_UseBuffer(typeOf (ap_obj, "h264einport"), ap_obj, ap_hdl,
+                       buf, idx, private, size, NULL);
    if (r)
       return r;
 
@@ -88,12 +88,10 @@ static OMX_ERRORTYPE h264e_inport_AllocateBuffer (const void * ap_obj, OMX_HANDL
 
    LIST_INITHEAD(&inp->tasks);
 
-   FREE((*buf)->pBuffer);
    r = enc_AllocateBackTexture(ap_hdl, idx, &inp->resource, &inp->transfer, &(*buf)->pBuffer);
 
    if (r) {
       FREE(inp);
-      super_FreeBuffer(typeOf (ap_obj, "h264einport"), ap_obj, ap_hdl, idx, *buf);
       return r;
    }
 
@@ -137,7 +135,6 @@ static OMX_ERRORTYPE h264e_inport_FreeBuffer(const void * ap_obj, OMX_HANDLETYPE
       pipe_resource_reference(&inp->resource, NULL);
       FREE(inp);
    }
-   buf->pBuffer = NULL;
 
    return super_FreeBuffer(typeOf (ap_obj, "h264einport"), ap_obj, ap_hdl, idx, buf);
 }

@@ -34,12 +34,11 @@ static OMX_ERRORTYPE h264e_outport_AllocateBuffer(const void * ap_obj, OMX_HANDL
 {
    OMX_ERRORTYPE r;
 
-   r = super_AllocateBuffer(typeOf (ap_obj, "h264eoutport"), ap_obj, ap_hdl,
-                            buf, idx, private, size);
+   r = super_UseBuffer(typeOf (ap_obj, "h264eoutport"), ap_obj, ap_hdl,
+                            buf, idx, private, size, NULL);
    if (r)
       return r;
 
-   FREE((*buf)->pBuffer);
    (*buf)->pBuffer = NULL;
    (*buf)->pOutputPortPrivate = CALLOC(1, sizeof(struct output_buf_private));
    if (!(*buf)->pOutputPortPrivate) {
@@ -63,7 +62,6 @@ static OMX_ERRORTYPE h264e_outport_FreeBuffer(const void * ap_obj, OMX_HANDLETYP
       pipe_resource_reference(&inp->resource, NULL);
       FREE(inp);
    }
-   buf->pBuffer = NULL;
 
    return super_FreeBuffer(typeOf (ap_obj, "h264eoutport"), ap_obj, ap_hdl, idx, buf);
 }
