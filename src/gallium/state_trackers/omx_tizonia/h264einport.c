@@ -92,6 +92,7 @@ static OMX_ERRORTYPE h264e_inport_AllocateBuffer (const void * ap_obj, OMX_HANDL
 
    if (r) {
       FREE(inp);
+      super_FreeBuffer(typeOf (ap_obj, "h264einport"), ap_obj, ap_hdl, idx, *buf);
       return r;
    }
 
