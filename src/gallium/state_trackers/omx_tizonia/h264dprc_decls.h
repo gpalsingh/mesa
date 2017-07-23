@@ -51,6 +51,7 @@ struct h264d_prc
     struct pipe_video_codec *codec;
     struct pipe_video_buffer *target;
     enum pipe_video_profile profile;
+    struct pipe_resource * p_res;
     struct {
         unsigned nal_ref_idc;
         bool IdrPicFlag;
@@ -79,6 +80,7 @@ struct h264d_prc
     bool disable_tunnel;
     struct vl_compositor compositor;
     struct vl_compositor_state cstate;
+    bool use_eglimage;
 };
 
 #endif

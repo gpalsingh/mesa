@@ -140,8 +140,10 @@ OMX_ERRORTYPE OMX_ComponentInit (OMX_HANDLETYPE ap_hdl)
     tiz_comp_register_roles (ap_hdl, rf_list, 2);
 
     /* Register egl image validation hook */
-    tiz_check_omx (tiz_comp_register_eglimage_hook
-                       (ap_hdl, &egl_validation_hook));
+    if (debug_get_option_mesa_enable_omx_eglimage()) {
+        tiz_check_omx (tiz_comp_register_role_eglimage_hook
+                       (ap_hdl, (const OMX_U8 *) OMX_VID_DEC_AVC_ROLE, &egl_validation_hook));
+    }
 
     return OMX_ErrorNone;
 }
