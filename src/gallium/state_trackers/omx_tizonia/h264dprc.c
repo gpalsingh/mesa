@@ -12,6 +12,9 @@
 #include "util/u_memory.h"
 #include "util/u_surface.h"
 
+#include "dri_screen.h"
+#include "egl_dri2.h"
+
 #define DPB_MAX_SIZE 5
 
 unsigned dec_frame_delta;
@@ -54,6 +57,8 @@ static const uint8_t Default_8x8_Inter[64] = {
    22, 24, 25, 27, 28, 30, 32, 33,
    24, 25, 27, 28, 30, 32, 33, 35
 };
+
+DEBUG_GET_ONCE_BOOL_OPTION(mesa_enable_omx_eglimage, "MESA_ENABLE_OMX_EGLIMAGE", false)
 
 static void h264d_free_input_port_private (OMX_BUFFERHEADERTYPE *buf)
 {
@@ -178,6 +183,42 @@ static OMX_BUFFERHEADERTYPE * get_input_buffer (h264d_prc_t * p_prc) {
     return p_prc->p_inhdr_;
 }
 
+static struct pipe_resource * st_omx_pipe_texture_from_eglimage (EGLDisplay egldisplay,
+                                                                 EGLImage eglimage)
+{
+    _EGLDisplay *disp = egldisplay;
+    struct dri2_egl_display *dri2_egl_dpy = disp->DriverData;
+    __DRIscreen *_dri_screen = dri2_egl_dpy->dri_screen;
+    struct dri_screen *st_dri_screen = dri_screen(_dri_screen);
+    __DRIimage *_dri_image = st_dri_screen->lookup_egl_image(st_dri_screen, eglimage);
+
+    return _dri_image->texture;
+}
+
+static void get_eglimage (h264d_prc_t * p_prc) {
+    OMX_PTR p_eglimage = NULL;
+    OMX_NATIVE_WINDOWTYPE * p_egldisplay = NULL;
+    const tiz_port_t * p_port = NULL;
+
+    if (OMX_ErrorNone ==
+        tiz_krn_claim_eglimage (tiz_get_krn (handleOf (p_prc)),
+                                OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX,
+                                p_prc->p_outhdr_, &p_eglimage)) {
+        printf ("Got EGLImage in get_eglimage: [%p]\n", p_eglimage);
+        p_port = tiz_krn_get_port (tiz_get_krn (handleOf (p_prc)),
+                                   OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX);
+        p_egldisplay = p_port->portdef_.format.video.pNativeWindow;
+        printf ("Out port pNativeWindow in get_eglimage: [%p]\n", p_egldisplay);
+        p_prc->p_res = st_omx_pipe_texture_from_eglimage (p_egldisplay, p_eglimage);
+    } else {
+        printf ("Failed to get EGLImage");
+        (void) tiz_krn_release_buffer (tiz_get_krn (handleOf (p_prc)),
+                                       OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX,
+                                       p_prc->p_outhdr_);
+        p_prc->p_outhdr_ = NULL;
+    }
+}
+
 static OMX_BUFFERHEADERTYPE * get_output_buffer (h264d_prc_t * p_prc) {
     assert (p_prc);
 
@@ -190,30 +231,11 @@ static OMX_BUFFERHEADERTYPE * get_output_buffer (h264d_prc_t * p_prc) {
             == tiz_krn_claim_buffer (tiz_get_krn (handleOf (p_prc)),
                                      OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX, 0,
                                      &p_prc->p_outhdr_)) {
-            if (p_prc->p_outhdr_) {
-                OMX_PTR p_eglimage = NULL;
-                /* Check pBuffer nullity to know if an eglimage have been registered. */
-                if (!p_prc->p_outhdr_->pBuffer &&
-                    OMX_ErrorNone == tiz_krn_claim_eglimage (tiz_get_krn (handleOf (p_prc)),
-                                                             OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX,
-                                                             p_prc->p_outhdr_, &p_eglimage)) {
-                    (void) tiz_krn_release_buffer (tiz_get_krn (handleOf (p_prc)),
-                                                   OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX,
-                                                   p_prc->p_outhdr_);
-                    p_prc->p_outhdr_ = NULL;
+            if (p_prc->p_outhdr_ && p_prc->use_eglimage) {
+                /* Check pBuffer nullity to know if an eglimage has been registered. */
+                if (!p_prc->p_outhdr_->pBuffer) {
+                    get_eglimage (p_prc);
                 }
-                printf("Got EGLImage in get_output_buffer: [%p]\n", p_eglimage);
-                const tiz_port_t * p_port = NULL;
-                p_port = tiz_krn_get_port (tiz_get_krn (handleOf (p_prc)), OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX);
-                printf("Out port (p_prc) pNativeWindow in get_output_buffer: [%p]\n",
-                        p_prc->out_port_def_.format.video.pNativeWindow);
-                printf("Out port pNativeWindow in get_output_buffer: [%p]\n",
-                        p_port->portdef_.format.video.pNativeWindow);
-                p_port = tiz_krn_get_port (tiz_get_krn (handleOf (p_prc)), OMX_VID_DEC_AVC_INPUT_PORT_INDEX);
-                printf("In port (p_prc) pNativeWindow in get_output_buffer: [%p]\n",
-                        p_prc->in_port_def_.format.video.pNativeWindow);
-                printf("In port pNativeWindow in get_output_buffer: [%p]\n",
-                        p_port->portdef_.format.video.pNativeWindow);
             }
         }
     }
@@ -1129,7 +1151,16 @@ static void h264d_need_target (h264d_prc_t *p_prc)
              PIPE_VIDEO_ENTRYPOINT_BITSTREAM,
              PIPE_VIDEO_CAP_PREFERS_INTERLACED
         );
-        p_prc->target = p_prc->pipe->create_video_buffer (p_prc->pipe, &templat);
+
+        if (p_prc->use_eglimage) {
+            struct pipe_resource *resources[VL_NUM_COMPONENTS];
+            memset(resources, 0, sizeof resources);
+            resources[0] = p_prc->p_res;
+
+            p_prc->target = vl_video_buffer_create_ex2 (p_prc->pipe, &templat, resources);
+        } else {
+            p_prc->target = p_prc->pipe->create_video_buffer (p_prc->pipe, &templat);
+        }
     }
 }
 
@@ -1494,6 +1525,7 @@ static void * h264d_prc_ctor (void *ap_obj, va_list * app)
     p_prc->out_port_disabled_   = false;
     p_prc->picture.base.profile = PIPE_VIDEO_PROFILE_MPEG4_AVC_HIGH;
     p_prc->profile = PIPE_VIDEO_PROFILE_MPEG4_AVC_HIGH;
+    p_prc->use_eglimage = debug_get_option_mesa_enable_omx_eglimage ();
     reset_stream_parameters(p_prc);
 
     return p_prc;
