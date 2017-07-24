@@ -1394,9 +1394,7 @@ static void h264d_frame_decoded (h264d_prc_t *p_prc, OMX_BUFFERHEADERTYPE* input
 /* Replacement for bellagio's omx_base_filter_BufferMgmtFunction */
 static void h264d_manage_buffers(h264d_prc_t* p_prc) {
     bool next_is_eos = p_prc->num_in_buffers == 2 ? !!(p_prc->in_buffers[1]->nFlags & OMX_BUFFERFLAG_EOS) : false;
-    if (p_prc->p_inhdr_->nFilledLen > 0) {
-        h264d_frame_decoded(p_prc, p_prc->in_buffers[0], p_prc->p_outhdr_);
-    }
+    h264d_frame_decoded(p_prc, p_prc->in_buffers[0], p_prc->p_outhdr_);
 
     p_prc->p_outhdr_->nTimeStamp = p_prc->in_buffers[0]->nTimeStamp;
 
