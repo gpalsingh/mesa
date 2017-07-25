@@ -53,7 +53,7 @@ static OMX_ERRORTYPE h264e_outport_FreeBuffer(const void * ap_obj, OMX_HANDLETYP
                                               OMX_U32 idx, OMX_BUFFERHEADERTYPE *buf)
 {
    h264e_prc_t *p_prc = tiz_get_prc (ap_hdl);
-   struct input_buf_private *inp = buf->pInputPortPrivate;
+   struct input_buf_private *inp = buf->pOutputPortPrivate;
 
    if (inp) {
       enc_ReleaseTasks(&inp->tasks);
