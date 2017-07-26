@@ -60,6 +60,25 @@ static const uint8_t Default_8x8_Inter[64] = {
 
 DEBUG_GET_ONCE_BOOL_OPTION(mesa_enable_omx_eglimage, "MESA_ENABLE_OMX_EGLIMAGE", false)
 
+#define PTR_TO_UINT(x) ((unsigned)((intptr_t)(x)))
+
+static unsigned handle_hash(void *key)
+{
+    return PTR_TO_UINT(key);
+}
+
+static int handle_compare(void *key1, void *key2)
+{
+    return PTR_TO_UINT(key1) != PTR_TO_UINT(key2);
+}
+
+static enum pipe_error hash_table_clear_item_callback (void *key, void *value, void *data)
+{
+    struct pipe_video_buffer *video_buffer = (struct pipe_video_buffer *)value;
+    //release video_buffer
+    return PIPE_OK;
+}
+
 static void h264d_free_input_port_private (OMX_BUFFERHEADERTYPE *buf)
 {
     struct pipe_video_buffer *vbuf = buf->pInputPortPrivate;
@@ -199,6 +218,10 @@ static void get_eglimage (h264d_prc_t * p_prc) {
     OMX_PTR p_eglimage = NULL;
     OMX_NATIVE_WINDOWTYPE * p_egldisplay = NULL;
     const tiz_port_t * p_port = NULL;
+    struct pipe_video_buffer templat = {};
+    struct pipe_video_buffer *video_buffer = NULL;
+    struct pipe_resource * p_res = NULL;
+    struct pipe_resource *resources[VL_NUM_COMPONENTS];
 
     if (OMX_ErrorNone ==
         tiz_krn_claim_eglimage (tiz_get_krn (handleOf (p_prc)),
@@ -209,7 +232,34 @@ static void get_eglimage (h264d_prc_t * p_prc) {
                                    OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX);
         p_egldisplay = p_port->portdef_.format.video.pNativeWindow;
         printf ("Out port pNativeWindow in get_eglimage: [%p]\n", p_egldisplay);
-        p_prc->p_res = st_omx_pipe_texture_from_eglimage (p_egldisplay, p_eglimage);
+
+        // See also https://patchwork.freedesktop.org/patch/168921/ fpr the hash_table
+        // TODO 2 call util_hash_table_destroy at approriate place and if not empty
+        // clear the video_buffer (values)
+        if (!util_hash_table_get(p_prc->video_buffer_map, p_prc->p_outhdr_)) {
+          p_res = st_omx_pipe_texture_from_eglimage (p_egldisplay, p_eglimage);
+
+          assert (p_res);
+
+          memset(&templat, 0, sizeof(templat));
+
+          assert (p_res->format == PIPE_FORMAT_R8G8B8A8_UNORM);
+
+          templat.buffer_format = PIPE_FORMAT_R8G8B8A8_UNORM; // RGBA
+          templat.chroma_format = PIPE_VIDEO_CHROMA_FORMAT_NONE;
+          templat.width = p_res->width0;
+          templat.height = p_res->height0;
+          templat.interlaced = 0;
+
+          memset(resources, 0, sizeof resources);
+          resources[0] = p_res;
+
+          video_buffer = vl_video_buffer_create_ex2 (p_prc->pipe, &templat, resources);
+
+          assert(video_buffer);
+
+          util_hash_table_set(p_prc->video_buffer_map, p_prc->p_outhdr_, video_buffer);
+        }
     } else {
         printf ("Failed to get EGLImage");
         (void) tiz_krn_release_buffer (tiz_get_krn (handleOf (p_prc)),
@@ -1152,15 +1202,7 @@ static void h264d_need_target (h264d_prc_t *p_prc)
              PIPE_VIDEO_CAP_PREFERS_INTERLACED
         );
 
-        if (p_prc->use_eglimage) {
-            struct pipe_resource *resources[VL_NUM_COMPONENTS];
-            memset(resources, 0, sizeof resources);
-            resources[0] = p_prc->p_res;
-
-            p_prc->target = vl_video_buffer_create_ex2 (p_prc->pipe, &templat, resources);
-        } else {
-            p_prc->target = p_prc->pipe->create_video_buffer (p_prc->pipe, &templat);
-        }
+        p_prc->target = p_prc->pipe->create_video_buffer (p_prc->pipe, &templat);
     }
 }
 
@@ -1341,6 +1383,48 @@ static void h264d_fill_output (h264d_prc_t *p_prc, struct pipe_video_buffer *buf
     unsigned width, height;
 
     views = buf->get_sampler_view_planes(buf);
+
+    if (!output->pBuffer) {
+       struct pipe_video_buffer *dst_buf = NULL;
+       struct pipe_surface **dst_surface = NULL;
+       struct vl_compositor *compositor = &p_prc->compositor;
+       struct vl_compositor_state *s = &p_prc->cstate;
+
+       /* Write into the current eglimage using
+        * the unique decoder target NV12 */
+
+       dst_buf = util_hash_table_get(p_prc->video_buffer_map, output);
+       assert(dst_buf);
+
+       dst_surface = dst_buf->get_surfaces(dst_buf);
+
+       views = buf->get_sampler_view_planes(buf);
+       assert(views);
+
+       vl_compositor_clear_layers(s);
+
+       // TODO: not sure of the exactitude of this sequence but the
+       // right solution should be close to that.
+	   for (i = 0; i < VL_MAX_SURFACES; ++i) {
+		  struct u_rect src_rect;
+		  if (!views[i] || !dst_surface[i])
+			 continue;
+		  src_rect.x0 = 0;
+		  src_rect.y0 = 0;
+		  src_rect.x1 = def->nFrameWidth;
+		  src_rect.y1 = def->nFrameHeight;
+		  if (i > 0) {
+			 src_rect.x1 /= 2;
+			 src_rect.y1 /= 2;
+		  }
+		  vl_compositor_set_rgba_layer(s, compositor, 0, views[i], &src_rect, NULL, NULL);
+		  vl_compositor_render(s, compositor, dst_surface[i], NULL, false);
+	   }
+
+	   p_prc->pipe->flush(p_prc->pipe, NULL, 0);
+
+       return;
+    }
 
     for (i = 0; i < 2 /* NV12 */; i++) {
         if (!views[i]) continue;
@@ -1569,6 +1653,8 @@ static OMX_ERRORTYPE h264d_prc_allocate_resources (void *ap_obj, OMX_U32 a_pid)
 
     LIST_INITHEAD (&p_prc->codec_data.dpb_list);
 
+    p_prc->video_buffer_map = util_hash_table_create (handle_hash, handle_compare);
+
     return OMX_ErrorNone;
 }
 
@@ -1576,6 +1662,12 @@ static OMX_ERRORTYPE h264d_prc_deallocate_resources (void *ap_obj)
 {
     h264d_prc_t *p_prc = ap_obj;
     assert (p_prc);
+
+    /* Clear hash table */
+    //util_hash_table_foreach (p_prc->video_buffer,
+                             //&hash_table_clear_item_callback,
+                             //NULL);
+    util_hash_table_destroy (p_prc->video_buffer_map);
 
     if (p_prc->pipe) {
         vl_compositor_cleanup_state (&p_prc->cstate);
