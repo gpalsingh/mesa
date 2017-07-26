@@ -7,6 +7,7 @@
 #include <tizport_decls.h>
 
 #include "util/list.h"
+#include "util/u_hash_table.h"
 
 #include "pipe/p_video_state.h"
 
@@ -51,7 +52,7 @@ struct h264d_prc
     struct pipe_video_codec *codec;
     struct pipe_video_buffer *target;
     enum pipe_video_profile profile;
-    struct pipe_resource * p_res;
+    struct util_hash_table *video_buffer_map;
     struct {
         unsigned nal_ref_idc;
         bool IdrPicFlag;
