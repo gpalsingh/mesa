@@ -1246,15 +1246,13 @@ static void decode_buffer (h264d_prc_t *p_prc, struct vl_vlc *vlc, unsigned min_
         vl_rbsp_init (&rbsp, vlc, ~0);
         seq_parameter_set (p_prc, &rbsp);
         update_port_parameters (p_prc);
-        p_prc->first_buf_in_frame = false;
 
     } else if (nal_unit_type == 8) {
         struct vl_rbsp rbsp;
         vl_rbsp_init (&rbsp, vlc, ~0);
         picture_parameter_set (p_prc, &rbsp);
 
-    } else if ((nal_unit_type == 1 || nal_unit_type == 5) &&
-                !p_prc->out_port_disabled_) {
+    } else if (nal_unit_type == 1 || nal_unit_type == 5) {
         /* Coded slice of a non-IDR or IDR picture */
         unsigned bits = vl_vlc_valid_bits (vlc);
         unsigned bytes = bits / 8 + 4;
