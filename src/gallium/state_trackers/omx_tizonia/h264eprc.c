@@ -848,11 +848,12 @@ static OMX_ERRORTYPE h264e_prc_stop_and_return (void *ap_obj)
 
 static OMX_ERRORTYPE h264e_prc_buffers_ready (const void *ap_obj)
 {
-    assert(p_prc);
     h264e_prc_t *p_prc = (h264e_prc_t *) ap_obj;
     OMX_BUFFERHEADERTYPE *in_buf = NULL;
     OMX_BUFFERHEADERTYPE *out_buf = NULL;
     OMX_ERRORTYPE r = OMX_ErrorNone;
+
+    assert(p_prc);
 
     /* Don't get input buffer if output buffer not found */
     while (!p_prc->eos_ && (out_buf = get_output_buffer(p_prc)) && (in_buf = get_input_buffer(p_prc))) {
