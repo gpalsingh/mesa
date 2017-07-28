@@ -1517,8 +1517,7 @@ static void h264d_manage_buffers(h264d_prc_t* p_prc) {
 
     /* Realase output buffer if filled or eos
        Keep if two input buffers are being decoded */
-    if ((!next_is_eos) && ((p_prc->p_outhdr_->nFilledLen > 0) || p_prc->eos_)) {
-
+    if ((!next_is_eos) && ((p_prc->p_outhdr_->nFilledLen > 0) || p_prc->use_eglimage  || p_prc->eos_)) {
         h264d_buffer_filled(p_prc, p_prc->p_outhdr_);
     }
 
