@@ -195,7 +195,9 @@ static OMX_BUFFERHEADERTYPE * get_input_buffer (h264d_prc_t * p_prc) {
         h264d_shift_buffers_left(p_prc);
     }
 
-    assert (!p_prc->p_inhdr_); /* decode_frame expects new buffers each time */
+    /* decode_frame expects new buffers each time */
+    bool can_get_new_header = (!p_prc->p_inhdr_) || p_prc->first_buf_in_frame;
+    assert (can_get_new_header);
     tiz_krn_claim_buffer (tiz_get_krn (handleOf (p_prc)),
                           OMX_VID_DEC_AVC_INPUT_PORT_INDEX, 0,
                           &p_prc->p_inhdr_);
@@ -1516,6 +1518,7 @@ static void h264d_manage_buffers(h264d_prc_t* p_prc) {
     /* Realase output buffer if filled or eos
        Keep if two input buffers are being decoded */
     if ((!next_is_eos) && ((p_prc->p_outhdr_->nFilledLen > 0) || p_prc->eos_)) {
+
         h264d_buffer_filled(p_prc, p_prc->p_outhdr_);
     }
 
@@ -1716,10 +1719,11 @@ static OMX_ERRORTYPE h264d_prc_stop_and_return (void *ap_obj)
 
 static OMX_ERRORTYPE h264d_prc_buffers_ready (const void *ap_obj)
 {
-    assert(p_prc);
     h264d_prc_t *p_prc = (h264d_prc_t *) ap_obj;
     OMX_BUFFERHEADERTYPE *in_buf = NULL;
     OMX_BUFFERHEADERTYPE *out_buf = NULL;
+
+    assert(p_prc);
 
     /* Set parameters if start of stream */
     if (!p_prc->eos_ && p_prc->first_buf_in_frame && (in_buf = get_input_buffer(p_prc))) {
