@@ -229,15 +229,10 @@ static void get_eglimage (h264d_prc_t * p_prc) {
         tiz_krn_claim_eglimage (tiz_get_krn (handleOf (p_prc)),
                                 OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX,
                                 p_prc->p_outhdr_, &p_eglimage)) {
-        printf ("Got EGLImage in get_eglimage: [%p]\n", p_eglimage);
         p_port = tiz_krn_get_port (tiz_get_krn (handleOf (p_prc)),
                                    OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX);
         p_egldisplay = p_port->portdef_.format.video.pNativeWindow;
-        printf ("Out port pNativeWindow in get_eglimage: [%p]\n", p_egldisplay);
 
-        // See also https://patchwork.freedesktop.org/patch/168921/ fpr the hash_table
-        // TODO 2 call util_hash_table_destroy at approriate place and if not empty
-        // clear the video_buffer (values)
         if (!util_hash_table_get(p_prc->video_buffer_map, p_prc->p_outhdr_)) {
           p_res = st_omx_pipe_texture_from_eglimage (p_egldisplay, p_eglimage);
 
@@ -263,7 +258,6 @@ static void get_eglimage (h264d_prc_t * p_prc) {
           util_hash_table_set(p_prc->video_buffer_map, p_prc->p_outhdr_, video_buffer);
         }
     } else {
-        printf ("Failed to get EGLImage");
         (void) tiz_krn_release_buffer (tiz_get_krn (handleOf (p_prc)),
                                        OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX,
                                        p_prc->p_outhdr_);
