@@ -73,7 +73,7 @@ static int handle_compare(void *key1, void *key2)
 static enum pipe_error hash_table_clear_item_callback (void *key, void *value, void *data)
 {
     struct pipe_video_buffer *video_buffer = (struct pipe_video_buffer *)value;
-    video_buffer->destroy (video_buffer);
+    //release video_buffer
     return PIPE_OK;
 }
 
@@ -1658,9 +1658,9 @@ static OMX_ERRORTYPE h264d_prc_deallocate_resources (void *ap_obj)
     assert (p_prc);
 
     /* Clear hash table */
-    util_hash_table_foreach (p_prc->video_buffer_map,
-                             &hash_table_clear_item_callback,
-                             NULL);
+    //util_hash_table_foreach (p_prc->video_buffer,
+                             //&hash_table_clear_item_callback,
+                             //NULL);
     util_hash_table_destroy (p_prc->video_buffer_map);
 
     if (p_prc->pipe) {
