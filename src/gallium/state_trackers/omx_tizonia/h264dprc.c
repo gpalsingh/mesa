@@ -58,8 +58,6 @@ static const uint8_t Default_8x8_Inter[64] = {
    24, 25, 27, 28, 30, 32, 33, 35
 };
 
-DEBUG_GET_ONCE_BOOL_OPTION(mesa_enable_omx_eglimage, "MESA_ENABLE_OMX_EGLIMAGE", false)
-
 #define PTR_TO_UINT(x) ((unsigned)((intptr_t)(x)))
 
 static unsigned handle_hash(void *key)
@@ -229,6 +227,7 @@ static void get_eglimage (h264d_prc_t * p_prc) {
         tiz_krn_claim_eglimage (tiz_get_krn (handleOf (p_prc)),
                                 OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX,
                                 p_prc->p_outhdr_, &p_eglimage)) {
+        p_prc->use_eglimage = true;
         p_port = tiz_krn_get_port (tiz_get_krn (handleOf (p_prc)),
                                    OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX);
         p_egldisplay = p_port->portdef_.format.video.pNativeWindow;
@@ -277,7 +276,7 @@ static OMX_BUFFERHEADERTYPE * get_output_buffer (h264d_prc_t * p_prc) {
             == tiz_krn_claim_buffer (tiz_get_krn (handleOf (p_prc)),
                                      OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX, 0,
                                      &p_prc->p_outhdr_)) {
-            if (p_prc->p_outhdr_ && p_prc->use_eglimage) {
+            if (p_prc->p_outhdr_) {
                 /* Check pBuffer nullity to know if an eglimage has been registered. */
                 if (!p_prc->p_outhdr_->pBuffer) {
                     get_eglimage (p_prc);
@@ -1605,7 +1604,6 @@ static void * h264d_prc_ctor (void *ap_obj, va_list * app)
     p_prc->out_port_disabled_   = false;
     p_prc->picture.base.profile = PIPE_VIDEO_PROFILE_MPEG4_AVC_HIGH;
     p_prc->profile = PIPE_VIDEO_PROFILE_MPEG4_AVC_HIGH;
-    p_prc->use_eglimage = debug_get_option_mesa_enable_omx_eglimage ();
     reset_stream_parameters(p_prc);
 
     return p_prc;
