@@ -12,14 +12,14 @@
 #include "h264einport_decls.h"
 #include "h264e_common.h"
 
-static OMX_ERRORTYPE enc_AllocateBackTexture (OMX_HANDLETYPE ap_hdl,
-                                              OMX_U32 idx,
-                                              struct pipe_resource **resource,
-                                              struct pipe_transfer **transfer,
-                                              OMX_U8 **map)
+static OMX_ERRORTYPE enc_AllocateBackTexture(OMX_HANDLETYPE ap_hdl,
+                                             OMX_U32 idx,
+                                             struct pipe_resource **resource,
+                                             struct pipe_transfer **transfer,
+                                             OMX_U8 **map)
 {
-   h264e_prc_t * p_prc = tiz_get_prc (ap_hdl);
-   tiz_port_t * port = tiz_krn_get_port (tiz_get_krn (ap_hdl), idx);
+   h264e_prc_t * p_prc = tiz_get_prc(ap_hdl);
+   tiz_port_t * port = tiz_krn_get_port(tiz_get_krn(ap_hdl), idx);
    struct pipe_resource buf_templ;
    struct pipe_box box = {};
    OMX_U8 *ptr;
@@ -53,37 +53,36 @@ static OMX_ERRORTYPE enc_AllocateBackTexture (OMX_HANDLETYPE ap_hdl,
  * h264einport class
  */
 
-static void * h264e_inport_ctor (void * ap_obj, va_list * app)
+static void * h264e_inport_ctor(void * ap_obj, va_list * app)
 {
-  return super_ctor (typeOf (ap_obj, "h264einport"), ap_obj, app);
+   return super_ctor(typeOf(ap_obj, "h264einport"), ap_obj, app);
 }
 
-static void * h264e_inport_dtor (void * ap_obj)
+static void * h264e_inport_dtor(void * ap_obj)
 {
-  return super_dtor (typeOf (ap_obj, "h264einport"), ap_obj);
+   return super_dtor(typeOf(ap_obj, "h264einport"), ap_obj);
 }
 
 /*
  * from tiz_api
  */
 
-static OMX_ERRORTYPE h264e_inport_AllocateBuffer (const void * ap_obj, OMX_HANDLETYPE ap_hdl,
-                                                   OMX_BUFFERHEADERTYPE ** buf, OMX_U32 idx,
-                                                   OMX_PTR private, OMX_U32 size)
+static OMX_ERRORTYPE h264e_inport_AllocateBuffer(const void * ap_obj, OMX_HANDLETYPE ap_hdl,
+                                                 OMX_BUFFERHEADERTYPE ** buf, OMX_U32 idx,
+                                                 OMX_PTR private, OMX_U32 size)
 {
    struct input_buf_private *inp;
-   h264e_inport_t * p_obj = (h264e_inport_t *) ap_obj;
    OMX_ERRORTYPE r;
 
-   r = super_UseBuffer(typeOf (ap_obj, "h264einport"), ap_obj, ap_hdl,
+   r = super_UseBuffer(typeOf(ap_obj, "h264einport"), ap_obj, ap_hdl,
                        buf, idx, private, size, NULL);
    if (r)
-      return r;
+     return r;
 
    inp = (*buf)->pInputPortPrivate = CALLOC_STRUCT(input_buf_private);
    if (!inp) {
-      super_FreeBuffer(typeOf (ap_obj, "h264einport"), ap_obj, ap_hdl, idx, *buf);
-      return OMX_ErrorInsufficientResources;
+     super_FreeBuffer(typeOf(ap_obj, "h264einport"), ap_obj, ap_hdl, idx, *buf);
+     return OMX_ErrorInsufficientResources;
    }
 
    LIST_INITHEAD(&inp->tasks);
@@ -91,30 +90,30 @@ static OMX_ERRORTYPE h264e_inport_AllocateBuffer (const void * ap_obj, OMX_HANDL
    r = enc_AllocateBackTexture(ap_hdl, idx, &inp->resource, &inp->transfer, &(*buf)->pBuffer);
 
    if (r) {
-      FREE(inp);
-      super_FreeBuffer(typeOf (ap_obj, "h264einport"), ap_obj, ap_hdl, idx, *buf);
-      return r;
+     FREE(inp);
+     super_FreeBuffer(typeOf(ap_obj, "h264einport"), ap_obj, ap_hdl, idx, *buf);
+     return r;
    }
 
    return OMX_ErrorNone;
 }
 
-static OMX_ERRORTYPE h264e_inport_UseBuffer (const void * ap_obj, OMX_HANDLETYPE ap_hdl,
-                                             OMX_BUFFERHEADERTYPE **buf, OMX_U32 idx,
-                                             OMX_PTR private, OMX_U32 size, OMX_U8 *mem)
+static OMX_ERRORTYPE h264e_inport_UseBuffer(const void * ap_obj, OMX_HANDLETYPE ap_hdl,
+                                            OMX_BUFFERHEADERTYPE **buf, OMX_U32 idx,
+                                            OMX_PTR private, OMX_U32 size, OMX_U8 *mem)
 {
    struct input_buf_private *inp;
    OMX_ERRORTYPE r;
 
-   r = super_UseBuffer(typeOf (ap_obj, "h264einport"), ap_obj, ap_hdl,
+   r = super_UseBuffer(typeOf(ap_obj, "h264einport"), ap_obj, ap_hdl,
                        buf, idx, private, size, mem);
    if (r)
-      return r;
+     return r;
 
    inp = (*buf)->pInputPortPrivate = CALLOC_STRUCT(input_buf_private);
    if (!inp) {
-      super_FreeBuffer(typeOf (ap_obj, "h264einport"), ap_obj, ap_hdl, idx, *buf);
-      return OMX_ErrorInsufficientResources;
+     super_FreeBuffer(typeOf(ap_obj, "h264einport"), ap_obj, ap_hdl, idx, *buf);
+     return OMX_ErrorInsufficientResources;
    }
 
    LIST_INITHEAD(&inp->tasks);
@@ -125,69 +124,66 @@ static OMX_ERRORTYPE h264e_inport_UseBuffer (const void * ap_obj, OMX_HANDLETYPE
 static OMX_ERRORTYPE h264e_inport_FreeBuffer(const void * ap_obj, OMX_HANDLETYPE ap_hdl,
                                              OMX_U32 idx, OMX_BUFFERHEADERTYPE *buf)
 {
-   h264e_inport_t * p_obj = (h264e_inport_t *) ap_obj;
-   h264e_prc_t *p_prc = tiz_get_prc (ap_hdl);
+   h264e_prc_t *p_prc = tiz_get_prc(ap_hdl);
    struct input_buf_private *inp = buf->pInputPortPrivate;
 
    if (inp) {
-      enc_ReleaseTasks(&inp->tasks);
-      if (inp->transfer)
-         pipe_transfer_unmap(p_prc->s_pipe, inp->transfer);
-      pipe_resource_reference(&inp->resource, NULL);
-      FREE(inp);
+     enc_ReleaseTasks(&inp->tasks);
+     if (inp->transfer)
+       pipe_transfer_unmap(p_prc->s_pipe, inp->transfer);
+     pipe_resource_reference(&inp->resource, NULL);
+     FREE(inp);
    }
 
-   return super_FreeBuffer(typeOf (ap_obj, "h264einport"), ap_obj, ap_hdl, idx, buf);
+   return super_FreeBuffer(typeOf(ap_obj, "h264einport"), ap_obj, ap_hdl, idx, buf);
 }
 
 /*
  * h264einport_class
  */
 
-static void * h264e_inport_class_ctor (void * ap_obj, va_list * app)
+static void * h264e_inport_class_ctor(void * ap_obj, va_list * app)
 {
-  /* NOTE: Class methods might be added in the future. None for now. */
-  return super_ctor (typeOf (ap_obj, "h264einport_class"), ap_obj, app);
+   /* NOTE: Class methods might be added in the future. None for now. */
+   return super_ctor (typeOf (ap_obj, "h264einport_class"), ap_obj, app);
 }
 
 /*
  * initialization
  */
 
-void *
-h264e_inport_class_init (void * ap_tos, void * ap_hdl)
+void * h264e_inport_class_init(void * ap_tos, void * ap_hdl)
 {
-  void * tizvideoport = tiz_get_type (ap_hdl, "tizvideoport");
-  void * h264einport_class
-    = factory_new (classOf (tizvideoport), "h264einport_class",
-                   classOf (tizvideoport), sizeof (h264e_inport_class_t),
+   void * tizvideoport = tiz_get_type(ap_hdl, "tizvideoport");
+   void * h264einport_class
+     = factory_new(classOf(tizvideoport), "h264einport_class",
+                   classOf(tizvideoport), sizeof(h264e_inport_class_t),
                    ap_tos, ap_hdl, ctor, h264e_inport_class_ctor, 0);
-  return h264einport_class;
+   return h264einport_class;
 }
 
-void *
-h264e_inport_init (void * ap_tos, void * ap_hdl)
+void * h264e_inport_init(void * ap_tos, void * ap_hdl)
 {
-  void * tizvideoport = tiz_get_type (ap_hdl, "tizvideoport");
-  void * h264einport_class = tiz_get_type (ap_hdl, "h264einport_class");
-  void * h264einport = factory_new
-    /* TIZ_CLASS_COMMENT: class type, class name, parent, size */
-    (h264einport_class, "h264einport", tizvideoport,
-     sizeof (h264e_inport_t),
-     /* TIZ_CLASS_COMMENT: class constructor */
-     ap_tos, ap_hdl,
-     /* TIZ_CLASS_COMMENT: class constructor */
-     ctor, h264e_inport_ctor,
-     /* TIZ_CLASS_COMMENT: class destructor */
-     dtor, h264e_inport_dtor,
-     /* TIZ_CLASS_COMMENT: */
-     tiz_api_AllocateBuffer, h264e_inport_AllocateBuffer,
-     /* TIZ_CLASS_COMMENT: */
-     tiz_api_UseBuffer, h264e_inport_UseBuffer,
-     /* TIZ_CLASS_COMMENT: */
-     tiz_api_FreeBuffer, h264e_inport_FreeBuffer,
-     /* TIZ_CLASS_COMMENT: stop value*/
-     0);
+   void * tizvideoport = tiz_get_type (ap_hdl, "tizvideoport");
+   void * h264einport_class = tiz_get_type (ap_hdl, "h264einport_class");
+   void * h264einport = factory_new
+     /* TIZ_CLASS_COMMENT: class type, class name, parent, size */
+     (h264einport_class, "h264einport", tizvideoport,
+      sizeof (h264e_inport_t),
+      /* TIZ_CLASS_COMMENT: class constructor */
+      ap_tos, ap_hdl,
+      /* TIZ_CLASS_COMMENT: class constructor */
+      ctor, h264e_inport_ctor,
+      /* TIZ_CLASS_COMMENT: class destructor */
+      dtor, h264e_inport_dtor,
+      /* TIZ_CLASS_COMMENT: */
+      tiz_api_AllocateBuffer, h264e_inport_AllocateBuffer,
+      /* TIZ_CLASS_COMMENT: */
+      tiz_api_UseBuffer, h264e_inport_UseBuffer,
+      /* TIZ_CLASS_COMMENT: */
+      tiz_api_FreeBuffer, h264e_inport_FreeBuffer,
+      /* TIZ_CLASS_COMMENT: stop value*/
+      0);
 
-  return h264einport;
+   return h264einport;
 }
