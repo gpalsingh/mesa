@@ -13,15 +13,13 @@
 #include "h264eprc_decls.h"
 #include "h264e_common.h"
 
-/* Utility functions */
-
 static void enc_MoveTasks(struct list_head *from, struct list_head *to)
 {
-    to->prev->next = from->next;
-    from->next->prev = to->prev;
-    from->prev->next = to;
-    to->prev = from->prev;
-    LIST_INITHEAD(from);
+   to->prev->next = from->next;
+   from->next->prev = to->prev;
+   from->prev->next = to;
+   to->prev = from->prev;
+   LIST_INITHEAD(from);
 }
 
 static void enc_GetPictureParamPreset(struct pipe_h264_enc_picture_desc *picture)
@@ -92,167 +90,164 @@ static unsigned enc_TranslateOMXLevelToPipe(unsigned omx_level)
    }
 }
 
-/* H264e spefific */
+static OMX_ERRORTYPE init_port_structs(h264e_prc_t * p_prc) {
+   const void * p_krn = NULL;
 
-static OMX_ERRORTYPE init_port_structs (h264e_prc_t * p_prc) {
-    const void * p_krn = NULL;
+   assert(p_prc);
 
-    assert (p_prc);
+   /* Initialisation */
+   TIZ_INIT_OMX_PORT_STRUCT(p_prc->in_port_def_,
+                            OMX_VID_ENC_AVC_INPUT_PORT_INDEX);
+   TIZ_INIT_OMX_PORT_STRUCT(p_prc->out_port_def_,
+                            OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX);
+   TIZ_INIT_OMX_PORT_STRUCT(p_prc->bitrate,
+                            OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX);
+   TIZ_INIT_OMX_PORT_STRUCT(p_prc->quant,
+                            OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX);
+   TIZ_INIT_OMX_PORT_STRUCT(p_prc->profile_level,
+                            OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX);
 
-    /* Initialisation */
-    TIZ_INIT_OMX_PORT_STRUCT (p_prc->in_port_def_,
-                              OMX_VID_ENC_AVC_INPUT_PORT_INDEX);
-    TIZ_INIT_OMX_PORT_STRUCT (p_prc->out_port_def_,
-                              OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX);
-    TIZ_INIT_OMX_PORT_STRUCT (p_prc->bitrate,
-                              OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX);
-    TIZ_INIT_OMX_PORT_STRUCT (p_prc->quant,
-                              OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX);
-    TIZ_INIT_OMX_PORT_STRUCT (p_prc->profile_level,
-                              OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX);
+   /* Get values */
+   p_krn = tiz_get_krn(handleOf(p_prc));
 
-    /* Get values */
-    p_krn = tiz_get_krn (handleOf (p_prc));
+   tiz_check_omx(
+      tiz_api_GetParameter(p_krn, handleOf(p_prc),
+                           OMX_IndexParamPortDefinition, &(p_prc->in_port_def_)));
+   tiz_check_omx(
+      tiz_api_GetParameter(p_krn, handleOf(p_prc),
+                           OMX_IndexParamPortDefinition, &(p_prc->out_port_def_)));
+   tiz_check_omx(
+      tiz_api_GetParameter(p_krn, handleOf(p_prc),
+                           OMX_IndexParamVideoBitrate, &(p_prc->bitrate)));
+   tiz_check_omx(
+      tiz_api_GetParameter(p_krn, handleOf(p_prc),
+                           OMX_IndexParamVideoQuantization, &(p_prc->quant)));
+   tiz_check_omx(
+      tiz_api_GetParameter(p_krn, handleOf(p_prc),
+                           OMX_IndexParamVideoProfileLevelCurrent, &(p_prc->profile_level)));
 
-    tiz_check_omx (
-        tiz_api_GetParameter (p_krn, handleOf (p_prc),
-                              OMX_IndexParamPortDefinition, &(p_prc->in_port_def_)));
-    tiz_check_omx (
-        tiz_api_GetParameter (p_krn, handleOf (p_prc),
-                              OMX_IndexParamPortDefinition, &(p_prc->out_port_def_)));
-    tiz_check_omx (
-        tiz_api_GetParameter (p_krn, handleOf (p_prc),
-                              OMX_IndexParamVideoBitrate, &(p_prc->bitrate)));
-    tiz_check_omx (
-        tiz_api_GetParameter (p_krn, handleOf (p_prc),
-                              OMX_IndexParamVideoQuantization, &(p_prc->quant)));
-    tiz_check_omx (
-        tiz_api_GetParameter (p_krn, handleOf (p_prc),
-                              OMX_IndexParamVideoProfileLevelCurrent, &(p_prc->profile_level)));
-
-    return OMX_ErrorNone;
+   return OMX_ErrorNone;
 }
 
-static OMX_BUFFERHEADERTYPE * get_input_buffer (h264e_prc_t * p_prc) {
-    assert (p_prc);
+static OMX_BUFFERHEADERTYPE * get_input_buffer(h264e_prc_t * p_prc) {
+   assert(p_prc);
 
-    if (p_prc->in_port_disabled_) {
-        return NULL;
-    }
+   if (p_prc->in_port_disabled_) {
+      return NULL;
+   }
 
-    assert (!p_prc->p_inhdr_); /* encode_frame expects new buffers every time */
+   assert(!p_prc->p_inhdr_); /* encode_frame expects new buffers every time */
 
-    tiz_krn_claim_buffer (tiz_get_krn (handleOf (p_prc)),
-                          OMX_VID_ENC_AVC_INPUT_PORT_INDEX, 0,
-                          &p_prc->p_inhdr_);
-    return p_prc->p_inhdr_;
+   tiz_krn_claim_buffer(tiz_get_krn(handleOf(p_prc)),
+                        OMX_VID_ENC_AVC_INPUT_PORT_INDEX, 0,
+                        &p_prc->p_inhdr_);
+   return p_prc->p_inhdr_;
 }
 
-static OMX_BUFFERHEADERTYPE * get_output_buffer (h264e_prc_t * p_prc) {
-    assert (p_prc);
+static OMX_BUFFERHEADERTYPE * get_output_buffer(h264e_prc_t * p_prc) {
+   assert(p_prc);
 
-    if (p_prc->out_port_disabled_) {
-        return NULL;
-    }
+   if (p_prc->out_port_disabled_) {
+      return NULL;
+   }
 
-    if (!p_prc->p_outhdr_) {
-        tiz_krn_claim_buffer (tiz_get_krn (handleOf (p_prc)),
-                              OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX, 0,
-                              &p_prc->p_outhdr_);
-    }
-    return p_prc->p_outhdr_;
+   if (!p_prc->p_outhdr_) {
+      tiz_krn_claim_buffer(tiz_get_krn(handleOf(p_prc)),
+                           OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX, 0,
+                           &p_prc->p_outhdr_);
+   }
+   return p_prc->p_outhdr_;
 }
 
-static OMX_ERRORTYPE h264e_buffer_emptied (h264e_prc_t * p_prc, OMX_BUFFERHEADERTYPE * p_hdr)
+static OMX_ERRORTYPE h264e_buffer_emptied(h264e_prc_t * p_prc, OMX_BUFFERHEADERTYPE * p_hdr)
 {
-    OMX_ERRORTYPE r = OMX_ErrorNone;
+   OMX_ERRORTYPE r = OMX_ErrorNone;
 
-    assert (p_prc);
-    assert (p_prc->p_inhdr_ == p_hdr);
+   assert(p_prc);
+   assert(p_prc->p_inhdr_ == p_hdr);
 
-    if (!p_prc->out_port_disabled_) {
-        assert (p_hdr->nFilledLen == 0);
-        p_hdr->nOffset = 0;
+   if (!p_prc->out_port_disabled_) {
+      assert(p_hdr->nFilledLen == 0);
+      p_hdr->nOffset = 0;
 
-        if ((p_hdr->nFlags & OMX_BUFFERFLAG_EOS) != 0) {
-            p_prc->eos_ = true;
-        }
+      if ((p_hdr->nFlags & OMX_BUFFERFLAG_EOS) != 0) {
+         p_prc->eos_ = true;
+      }
 
-        r = tiz_krn_release_buffer (tiz_get_krn (handleOf (p_prc)), 0, p_hdr);
-        p_prc->p_inhdr_ = NULL;
-    }
+      r = tiz_krn_release_buffer(tiz_get_krn(handleOf(p_prc)), 0, p_hdr);
+      p_prc->p_inhdr_ = NULL;
+   }
 
-    return r;
+   return r;
 }
 
-static OMX_ERRORTYPE h264e_buffer_filled (h264e_prc_t * p_prc, OMX_BUFFERHEADERTYPE * p_hdr)
+static OMX_ERRORTYPE h264e_buffer_filled(h264e_prc_t * p_prc, OMX_BUFFERHEADERTYPE * p_hdr)
 {
-    OMX_ERRORTYPE r = OMX_ErrorNone;
+   OMX_ERRORTYPE r = OMX_ErrorNone;
 
-    assert (p_prc);
-    assert (p_prc->p_outhdr_ == p_hdr);
-    assert (p_hdr);
+   assert(p_prc);
+   assert(p_prc->p_outhdr_ == p_hdr);
+   assert(p_hdr);
 
-    if (!p_prc->in_port_disabled_) {
-        p_hdr->nOffset = 0;
+   if (!p_prc->in_port_disabled_) {
+      p_hdr->nOffset = 0;
 
-        if (p_prc->eos_) {
-            /* EOS has been received and all the input data has been consumed
-             * already, so its time to propagate the EOS flag */
-            p_prc->p_outhdr_->nFlags |= OMX_BUFFERFLAG_EOS;
-        }
+      if (p_prc->eos_) {
+         /* EOS has been received and all the input data has been consumed
+          * already, so its time to propagate the EOS flag */
+         p_prc->p_outhdr_->nFlags |= OMX_BUFFERFLAG_EOS;
+      }
 
-        r = tiz_krn_release_buffer (tiz_get_krn (handleOf (p_prc)),
-                                    OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX,
-                                    p_hdr);
-        p_prc->p_outhdr_ = NULL;
-    }
+      r = tiz_krn_release_buffer(tiz_get_krn(handleOf(p_prc)),
+                                 OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX,
+                                 p_hdr);
+      p_prc->p_outhdr_ = NULL;
+   }
 
-    return r;
+   return r;
 }
 
 
-static void release_input_header (h264e_prc_t * p_prc) {
-    assert(!p_prc->in_port_disabled_);
-    if (p_prc->p_inhdr_) {
-        (void) tiz_krn_release_buffer (tiz_get_krn (handleOf (p_prc)),
-                                       OMX_VID_ENC_AVC_INPUT_PORT_INDEX,
-                                       p_prc->p_inhdr_);
-    }
-    p_prc->p_inhdr_ = NULL;
+static void release_input_header(h264e_prc_t * p_prc) {
+   assert(!p_prc->in_port_disabled_);
+   if (p_prc->p_inhdr_) {
+      (void) tiz_krn_release_buffer(tiz_get_krn(handleOf(p_prc)),
+                             OMX_VID_ENC_AVC_INPUT_PORT_INDEX,
+                             p_prc->p_inhdr_);
+   }
+   p_prc->p_inhdr_ = NULL;
 }
 
-static void release_output_header (h264e_prc_t * p_prc) {
-    if (p_prc->p_outhdr_) {
-        assert(!p_prc->out_port_disabled_);
-        (void) tiz_krn_release_buffer (tiz_get_krn (handleOf (p_prc)),
-                                       OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX,
-                                       p_prc->p_outhdr_);
-        p_prc->p_outhdr_ = NULL;
-    }
+static void release_output_header(h264e_prc_t * p_prc) {
+   if (p_prc->p_outhdr_) {
+      assert(!p_prc->out_port_disabled_);
+      (void) tiz_krn_release_buffer(tiz_get_krn(handleOf(p_prc)),
+                             OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX,
+                             p_prc->p_outhdr_);
+      p_prc->p_outhdr_ = NULL;
+   }
 }
 
-static OMX_ERRORTYPE h264e_release_all_headers (h264e_prc_t * p_prc)
+static OMX_ERRORTYPE h264e_release_all_headers(h264e_prc_t * p_prc)
 {
-    assert (p_prc);
+   assert(p_prc);
 
-    release_input_header (p_prc);
-    release_output_header (p_prc);
+   release_input_header(p_prc);
+   release_output_header(p_prc);
 
-    return OMX_ErrorNone;
+   return OMX_ErrorNone;
 }
 
-static void reset_stream_parameters (h264e_prc_t * p_prc)
+static void reset_stream_parameters(h264e_prc_t * p_prc)
 {
-    assert (p_prc);
-    init_port_structs (p_prc);
-    p_prc->p_inhdr_ = 0;
-    p_prc->p_outhdr_ = 0;
-    /* Check if need to clear resources to reset current_scale_buffer and others */
-    p_prc->eos_ = false;
+   assert(p_prc);
+   init_port_structs(p_prc);
+   p_prc->p_inhdr_ = 0;
+   p_prc->p_outhdr_ = 0;
+   p_prc->eos_ = false;
 }
 
-static void h264e_buffer_encoded (h264e_prc_t * p_prc, OMX_BUFFERHEADERTYPE* input, OMX_BUFFERHEADERTYPE* output)
+static void h264e_buffer_encoded(h264e_prc_t * p_prc, OMX_BUFFERHEADERTYPE* input, OMX_BUFFERHEADERTYPE* output)
 {
    struct output_buf_private *outp = output->pOutputPortPrivate;
    struct input_buf_private *inp = input->pInputPortPrivate;
@@ -299,67 +294,62 @@ static void h264e_buffer_encoded (h264e_prc_t * p_prc, OMX_BUFFERHEADERTYPE* inp
 
 /* Replacement for bellagio's omx_base_filter_BufferMgmtFunction */
 static OMX_ERRORTYPE h264e_manage_buffers(h264e_prc_t* p_prc) {
-    OMX_BUFFERHEADERTYPE * in_buf = p_prc->p_inhdr_;
-    OMX_BUFFERHEADERTYPE * out_buf = p_prc->p_outhdr_;
-    OMX_ERRORTYPE r = OMX_ErrorNone;
+   OMX_BUFFERHEADERTYPE * in_buf = p_prc->p_inhdr_;
+   OMX_BUFFERHEADERTYPE * out_buf = p_prc->p_outhdr_;
+   OMX_ERRORTYPE r = OMX_ErrorNone;
 
-    if (in_buf->nFilledLen > 0) {
-        h264e_buffer_encoded (p_prc, in_buf, out_buf);
-    } else {
-        in_buf->nFilledLen = 0;
-    }
+   if (in_buf->nFilledLen > 0) {
+      h264e_buffer_encoded(p_prc, in_buf, out_buf);
+   } else {
+      in_buf->nFilledLen = 0;
+   }
 
-    out_buf->nTimeStamp = in_buf->nTimeStamp;
+   out_buf->nTimeStamp = in_buf->nTimeStamp;
 
-    /* Release input buffer if possible */
-    if (in_buf->nFilledLen == 0) {
-        r = h264e_buffer_emptied(p_prc, in_buf);
-    }
+   /* Release input buffer if possible */
+   if (in_buf->nFilledLen == 0) {
+      r = h264e_buffer_emptied(p_prc, in_buf);
+   }
 
-    /* Realase output buffer if filled or eos */
-    if ((out_buf->nFilledLen != 0) || p_prc->eos_) {
-        r = h264e_buffer_filled(p_prc, out_buf);
-    }
+   /* Realase output buffer if filled or eos */
+   if ((out_buf->nFilledLen != 0) || p_prc->eos_) {
+      r = h264e_buffer_filled(p_prc, out_buf);
+   }
 
-    return r;
+   return r;
 }
-
-/* End of Utlility functions */
-
-
-/* Encoder internal functions */
 
 static struct encode_task *enc_NeedTask(h264e_prc_t * p_prc)
 {
-    OMX_VIDEO_PORTDEFINITIONTYPE *def = &p_prc->in_port_def_.format.video;
+   OMX_VIDEO_PORTDEFINITIONTYPE *def = &p_prc->in_port_def_.format.video;
 
-    struct pipe_video_buffer templat = {};
-    struct encode_task *task;
+   struct pipe_video_buffer templat = {};
+   struct encode_task *task;
 
-    if (!LIST_IS_EMPTY(&p_prc->free_tasks)) {
-        task = LIST_ENTRY(struct encode_task, p_prc->free_tasks.next, list);
-        LIST_DEL(&task->list);
-        return task;
-    }
+   if (!LIST_IS_EMPTY(&p_prc->free_tasks)) {
+      task = LIST_ENTRY(struct encode_task, p_prc->free_tasks.next, list);
+      LIST_DEL(&task->list);
+      return task;
+   }
 
-    /* allocate a new one */
-    task = CALLOC_STRUCT(encode_task);
-    if (!task)
-        return NULL;
+   /* allocate a new one */
+   task = CALLOC_STRUCT(encode_task);
+   if (!task)
+      return NULL;
 
-    templat.buffer_format = PIPE_FORMAT_NV12;
-    templat.chroma_format = PIPE_VIDEO_CHROMA_FORMAT_420;
-    templat.width = def->nFrameWidth;
-    templat.height = def->nFrameHeight;
-    templat.interlaced = false;
+   templat.buffer_format = PIPE_FORMAT_NV12;
+   templat.chroma_format = PIPE_VIDEO_CHROMA_FORMAT_420;
+   templat.width = def->nFrameWidth;
+   templat.height = def->nFrameHeight;
+   templat.interlaced = false;
 
-    task->buf = p_prc->s_pipe->create_video_buffer(p_prc->s_pipe, &templat);
-    if (!task->buf) {
-        FREE(task);
-        return NULL;
-    }
+   task->buf = p_prc->s_pipe->create_video_buffer(p_prc->s_pipe, &templat);
+   if (!task->buf) {
+      FREE(task);
+      return NULL;
+   }
 
-    return task;
+   return task;
 }
 
 static void enc_ScaleInput(h264e_prc_t * p_prc, struct pipe_video_buffer **vbuf, unsigned *size)
@@ -599,356 +589,351 @@ static OMX_ERRORTYPE enc_LoadImage(h264e_prc_t * p_prc, OMX_BUFFERHEADERTYPE *bu
 
 static OMX_ERRORTYPE encode_frame(h264e_prc_t * p_prc, OMX_BUFFERHEADERTYPE * in_buf)
 {
-    struct input_buf_private *inp = in_buf->pInputPortPrivate;
-    enum pipe_h264_enc_picture_type picture_type;
-    struct encode_task *task;
-    unsigned stacked_num = 0;
-    OMX_ERRORTYPE err;
+   struct input_buf_private *inp = in_buf->pInputPortPrivate;
+   enum pipe_h264_enc_picture_type picture_type;
+   struct encode_task *task;
+   unsigned stacked_num = 0;
+   OMX_ERRORTYPE err;
 
-    enc_MoveTasks(&inp->tasks, &p_prc->free_tasks);
-    task = enc_NeedTask(p_prc);
-    if (!task)
-        return OMX_ErrorInsufficientResources;
+   enc_MoveTasks(&inp->tasks, &p_prc->free_tasks);
+   task = enc_NeedTask(p_prc);
+   if (!task)
+      return OMX_ErrorInsufficientResources;
 
-    /* EOS */
-    if (in_buf->nFilledLen == 0) {
-        if (in_buf->nFlags & OMX_BUFFERFLAG_EOS) {
-            in_buf->nFilledLen = in_buf->nAllocLen;
-            enc_ClearBframes(p_prc, inp);
-            enc_MoveTasks(&p_prc->stacked_tasks, &inp->tasks);
-            p_prc->codec->flush(p_prc->codec);
-        }
-        return h264e_manage_buffers(p_prc);
-    }
+   /* EOS */
+   if (in_buf->nFilledLen == 0) {
+      if (in_buf->nFlags & OMX_BUFFERFLAG_EOS) {
+         in_buf->nFilledLen = in_buf->nAllocLen;
+         enc_ClearBframes(p_prc, inp);
+         enc_MoveTasks(&p_prc->stacked_tasks, &inp->tasks);
+         p_prc->codec->flush(p_prc->codec);
+      }
+      return h264e_manage_buffers(p_prc);
+   }
 
-    if (in_buf->pOutputPortPrivate) {
-        struct pipe_video_buffer *vbuf = in_buf->pOutputPortPrivate;
-        in_buf->pOutputPortPrivate = task->buf;
-        task->buf = vbuf;
-    } else {
-        /* ------- load input image into video buffer ---- */
-        err = enc_LoadImage(p_prc, in_buf, task->buf);
-        if (err != OMX_ErrorNone) {
-            FREE(task);
-            return err;
-        }
-    }
+   if (in_buf->pOutputPortPrivate) {
+      struct pipe_video_buffer *vbuf = in_buf->pOutputPortPrivate;
+      in_buf->pOutputPortPrivate = task->buf;
+      task->buf = vbuf;
+   } else {
+      /* ------- load input image into video buffer ---- */
+      err = enc_LoadImage(p_prc, in_buf, task->buf);
+      if (err != OMX_ErrorNone) {
+         FREE(task);
+         return err;
+      }
+   }
 
-    /* -------------- determine picture type --------- */
-    if (!(p_prc->pic_order_cnt % OMX_VID_ENC_IDR_PERIOD_DEFAULT) ||
-         p_prc->force_pic_type.IntraRefreshVOP) {
-        enc_ClearBframes(p_prc, inp);
-        picture_type = PIPE_H264_ENC_PICTURE_TYPE_IDR;
-        p_prc->force_pic_type.IntraRefreshVOP = OMX_FALSE;
-        p_prc->frame_num = 0;
-    } else if (p_prc->codec->profile == PIPE_VIDEO_PROFILE_MPEG4_AVC_BASELINE ||
-                  !(p_prc->pic_order_cnt % OMX_VID_ENC_P_PERIOD_DEFAULT) ||
-                  (in_buf->nFlags & OMX_BUFFERFLAG_EOS)) {
-        picture_type = PIPE_H264_ENC_PICTURE_TYPE_P;
-    } else {
-        picture_type = PIPE_H264_ENC_PICTURE_TYPE_B;
-    }
+   /* -------------- determine picture type --------- */
+   if (!(p_prc->pic_order_cnt % OMX_VID_ENC_IDR_PERIOD_DEFAULT) ||
+       p_prc->force_pic_type.IntraRefreshVOP) {
+      enc_ClearBframes(p_prc, inp);
+      picture_type = PIPE_H264_ENC_PICTURE_TYPE_IDR;
+      p_prc->force_pic_type.IntraRefreshVOP = OMX_FALSE;
+      p_prc->frame_num = 0;
+   } else if (p_prc->codec->profile == PIPE_VIDEO_PROFILE_MPEG4_AVC_BASELINE ||
+              !(p_prc->pic_order_cnt % OMX_VID_ENC_P_PERIOD_DEFAULT) ||
+              (in_buf->nFlags & OMX_BUFFERFLAG_EOS)) {
+      picture_type = PIPE_H264_ENC_PICTURE_TYPE_P;
+   } else {
+      picture_type = PIPE_H264_ENC_PICTURE_TYPE_B;
+   }
 
-    task->pic_order_cnt = p_prc->pic_order_cnt++;
+   task->pic_order_cnt = p_prc->pic_order_cnt++;
 
-    if (picture_type == PIPE_H264_ENC_PICTURE_TYPE_B) {
-        /* put frame at the tail of the queue */
-        LIST_ADDTAIL(&task->list, &p_prc->b_frames);
-    } else {
-        /* handle I or P frame */
-        p_prc->ref_idx_l0 = p_prc->ref_idx_l1;
-        enc_HandleTask(p_prc, task, picture_type);
-        LIST_ADDTAIL(&task->list, &p_prc->stacked_tasks);
-        LIST_FOR_EACH_ENTRY(task, &p_prc->stacked_tasks, list) {
-            ++stacked_num;
-        }
-        if (stacked_num == p_prc->stacked_frames_num) {
-            struct encode_task *t;
-            t = LIST_ENTRY(struct encode_task, p_prc->stacked_tasks.next, list);
-            LIST_DEL(&t->list);
-            LIST_ADDTAIL(&t->list, &inp->tasks);
-        }
-        p_prc->ref_idx_l1 = p_prc->frame_num++;
+   if (picture_type == PIPE_H264_ENC_PICTURE_TYPE_B) {
+      /* put frame at the tail of the queue */
+      LIST_ADDTAIL(&task->list, &p_prc->b_frames);
+   } else {
+      /* handle I or P frame */
+      p_prc->ref_idx_l0 = p_prc->ref_idx_l1;
+      enc_HandleTask(p_prc, task, picture_type);
+      LIST_ADDTAIL(&task->list, &p_prc->stacked_tasks);
+      LIST_FOR_EACH_ENTRY(task, &p_prc->stacked_tasks, list) {
+         ++stacked_num;
+      }
+      if (stacked_num == p_prc->stacked_frames_num) {
+         struct encode_task *t;
+         t = LIST_ENTRY(struct encode_task, p_prc->stacked_tasks.next, list);
+         LIST_DEL(&t->list);
+         LIST_ADDTAIL(&t->list, &inp->tasks);
+      }
+      p_prc->ref_idx_l1 = p_prc->frame_num++;
 
-        /* handle B frames */
-        LIST_FOR_EACH_ENTRY(task, &p_prc->b_frames, list) {
-            enc_HandleTask(p_prc, task, PIPE_H264_ENC_PICTURE_TYPE_B);
-            if (!p_prc->restricted_b_frames)
-                p_prc->ref_idx_l0 = p_prc->frame_num;
-            p_prc->frame_num++;
-        }
+      /* handle B frames */
+      LIST_FOR_EACH_ENTRY(task, &p_prc->b_frames, list) {
+         enc_HandleTask(p_prc, task, PIPE_H264_ENC_PICTURE_TYPE_B);
+         if (!p_prc->restricted_b_frames)
+            p_prc->ref_idx_l0 = p_prc->frame_num;
+         p_prc->frame_num++;
+      }
 
-        enc_MoveTasks(&p_prc->b_frames, &inp->tasks);
-    }
+      enc_MoveTasks(&p_prc->b_frames, &inp->tasks);
+   }
 
-    if (LIST_IS_EMPTY(&inp->tasks))
-        return h264e_buffer_emptied(p_prc, in_buf);
-    else
-        return h264e_manage_buffers(p_prc);
+   if (LIST_IS_EMPTY(&inp->tasks))
+      return h264e_buffer_emptied(p_prc, in_buf);
+   else
+      return h264e_manage_buffers(p_prc);
 }
-
-/* End of Encoder Internal functions */
 
 /*
  * h264eprc
  */
 
-static void *
-h264e_prc_ctor (void *ap_obj, va_list * app)
+static void * h264e_prc_ctor(void *ap_obj, va_list * app)
 {
-    h264e_prc_t *p_prc = super_ctor (typeOf (ap_obj, "h264eprc"), ap_obj, app);
-    assert (p_prc);
-    p_prc->p_inhdr_ = 0;
-    p_prc->p_outhdr_ = 0;
-    p_prc->profile_level.eProfile = OMX_VIDEO_AVCProfileBaseline;
-    p_prc->profile_level.eLevel = OMX_VIDEO_AVCLevel51;
-    p_prc->force_pic_type.IntraRefreshVOP = OMX_FALSE;
-    p_prc->frame_num = 0;
-    p_prc->pic_order_cnt = 0;
-    p_prc->restricted_b_frames = debug_get_bool_option("OMX_USE_RESTRICTED_B_FRAMES", FALSE);
-    p_prc->scale.xWidth = OMX_VID_ENC_SCALING_WIDTH_DEFAULT;
-    p_prc->scale.xHeight = OMX_VID_ENC_SCALING_WIDTH_DEFAULT;
-    p_prc->in_port_disabled_    = false;
-    p_prc->out_port_disabled_   = false;
-    reset_stream_parameters(p_prc);
+   h264e_prc_t *p_prc = super_ctor(typeOf(ap_obj, "h264eprc"), ap_obj, app);
+   assert (p_prc);
+   p_prc->p_inhdr_ = 0;
+   p_prc->p_outhdr_ = 0;
+   p_prc->profile_level.eProfile = OMX_VIDEO_AVCProfileBaseline;
+   p_prc->profile_level.eLevel = OMX_VIDEO_AVCLevel51;
+   p_prc->force_pic_type.IntraRefreshVOP = OMX_FALSE;
+   p_prc->frame_num = 0;
+   p_prc->pic_order_cnt = 0;
+   p_prc->restricted_b_frames = debug_get_bool_option("OMX_USE_RESTRICTED_B_FRAMES", FALSE);
+   p_prc->scale.xWidth = OMX_VID_ENC_SCALING_WIDTH_DEFAULT;
+   p_prc->scale.xHeight = OMX_VID_ENC_SCALING_WIDTH_DEFAULT;
+   p_prc->in_port_disabled_   = false;
+   p_prc->out_port_disabled_   = false;
+   reset_stream_parameters(p_prc);
 
-    return p_prc;
+   return p_prc;
 }
 
-static void * h264e_prc_dtor (void *ap_obj)
+static void * h264e_prc_dtor(void *ap_obj)
 {
-    h264e_prc_t *p_prc = ap_obj;
-
-    return super_dtor (typeOf (ap_obj, "h264eprc"), ap_obj);
+   return super_dtor(typeOf(ap_obj, "h264eprc"), ap_obj);
 }
 
-static OMX_ERRORTYPE h264e_prc_allocate_resources (void *ap_obj, OMX_U32 a_pid)
+static OMX_ERRORTYPE h264e_prc_allocate_resources(void *ap_obj, OMX_U32 a_pid)
 {
-    h264e_prc_t *p_prc = ap_obj;
-    struct pipe_screen *screen;
+   h264e_prc_t *p_prc = ap_obj;
+   struct pipe_screen *screen;
 
-    p_prc->screen = omx_get_screen ();
-    if (!p_prc->screen)
-        return OMX_ErrorInsufficientResources;
+   p_prc->screen = omx_get_screen();
+   if (!p_prc->screen)
+      return OMX_ErrorInsufficientResources;
 
-    screen = p_prc->screen->pscreen;
-    if (!screen->get_video_param(screen, PIPE_VIDEO_PROFILE_MPEG4_AVC_HIGH,
-                                 PIPE_VIDEO_ENTRYPOINT_ENCODE, PIPE_VIDEO_CAP_SUPPORTED))
-       return OMX_ErrorBadParameter;
+   screen = p_prc->screen->pscreen;
+   if (!screen->get_video_param(screen, PIPE_VIDEO_PROFILE_MPEG4_AVC_HIGH,
+                                PIPE_VIDEO_ENTRYPOINT_ENCODE, PIPE_VIDEO_CAP_SUPPORTED))
+      return OMX_ErrorBadParameter;
 
-    p_prc->s_pipe = screen->context_create(screen, NULL, 0);
-    if (!p_prc->s_pipe)
-        return OMX_ErrorInsufficientResources;
+   p_prc->s_pipe = screen->context_create(screen, NULL, 0);
+   if (!p_prc->s_pipe)
+      return OMX_ErrorInsufficientResources;
 
-    if (!vl_compositor_init(&p_prc->compositor, p_prc->s_pipe)) {
-        p_prc->s_pipe->destroy(p_prc->s_pipe);
-        p_prc->s_pipe = NULL;
-        return OMX_ErrorInsufficientResources;
-    }
+   if (!vl_compositor_init(&p_prc->compositor, p_prc->s_pipe)) {
+      p_prc->s_pipe->destroy(p_prc->s_pipe);
+      p_prc->s_pipe = NULL;
+      return OMX_ErrorInsufficientResources;
+   }
 
-    if (!vl_compositor_init_state(&p_prc->cstate, p_prc->s_pipe)) {
-        vl_compositor_cleanup(&p_prc->compositor);
-        p_prc->s_pipe->destroy(p_prc->s_pipe);
-        p_prc->s_pipe = NULL;
-        return OMX_ErrorInsufficientResources;
-    }
+   if (!vl_compositor_init_state(&p_prc->cstate, p_prc->s_pipe)) {
+      vl_compositor_cleanup(&p_prc->compositor);
+      p_prc->s_pipe->destroy(p_prc->s_pipe);
+      p_prc->s_pipe = NULL;
+      return OMX_ErrorInsufficientResources;
+   }
 
-    p_prc->t_pipe = screen->context_create(screen, NULL, 0);
-    if (!p_prc->t_pipe)
-        return OMX_ErrorInsufficientResources;
+   p_prc->t_pipe = screen->context_create(screen, NULL, 0);
+   if (!p_prc->t_pipe)
+      return OMX_ErrorInsufficientResources;
 
-    LIST_INITHEAD(&p_prc->free_tasks);
-    LIST_INITHEAD(&p_prc->used_tasks);
-    LIST_INITHEAD(&p_prc->b_frames);
-    LIST_INITHEAD(&p_prc->stacked_tasks);
+   LIST_INITHEAD(&p_prc->free_tasks);
+   LIST_INITHEAD(&p_prc->used_tasks);
+   LIST_INITHEAD(&p_prc->b_frames);
+   LIST_INITHEAD(&p_prc->stacked_tasks);
 
-    return OMX_ErrorNone;
+   return OMX_ErrorNone;
 }
 
-static OMX_ERRORTYPE h264e_prc_deallocate_resources (void *ap_obj)
+static OMX_ERRORTYPE h264e_prc_deallocate_resources(void *ap_obj)
 {
-    h264e_prc_t *p_prc = ap_obj;
-    int i;
+   h264e_prc_t *p_prc = ap_obj;
+   int i;
 
-    assert (p_prc);
+   assert (p_prc);
 
-    enc_ReleaseTasks(&p_prc->free_tasks);
-    enc_ReleaseTasks(&p_prc->used_tasks);
-    enc_ReleaseTasks(&p_prc->b_frames);
-    enc_ReleaseTasks(&p_prc->stacked_tasks);
+   enc_ReleaseTasks(&p_prc->free_tasks);
+   enc_ReleaseTasks(&p_prc->used_tasks);
+   enc_ReleaseTasks(&p_prc->b_frames);
+   enc_ReleaseTasks(&p_prc->stacked_tasks);
 
-    for (i = 0; i < OMX_VID_ENC_NUM_SCALING_BUFFERS; ++i)
-        if (p_prc->scale_buffer[i])
-        p_prc->scale_buffer[i]->destroy(p_prc->scale_buffer[i]);
+   for (i = 0; i < OMX_VID_ENC_NUM_SCALING_BUFFERS; ++i)
+      if (p_prc->scale_buffer[i])
+      p_prc->scale_buffer[i]->destroy(p_prc->scale_buffer[i]);
 
-    if (p_prc->s_pipe) {
-        vl_compositor_cleanup_state(&p_prc->cstate);
-        vl_compositor_cleanup(&p_prc->compositor);
-        p_prc->s_pipe->destroy(p_prc->s_pipe);
-    }
+   if (p_prc->s_pipe) {
+      vl_compositor_cleanup_state(&p_prc->cstate);
+      vl_compositor_cleanup(&p_prc->compositor);
+      p_prc->s_pipe->destroy(p_prc->s_pipe);
+   }
 
-    if (p_prc->t_pipe)
-        p_prc->t_pipe->destroy(p_prc->t_pipe);
+   if (p_prc->t_pipe)
+      p_prc->t_pipe->destroy(p_prc->t_pipe);
 
-    if (p_prc->screen)
-        omx_put_screen ();
+   if (p_prc->screen)
+      omx_put_screen();
 
-    return OMX_ErrorNone;
+   return OMX_ErrorNone;
 }
 
-static OMX_ERRORTYPE h264e_prc_prepare_to_transfer (void *ap_obj, OMX_U32 a_pid)
+static OMX_ERRORTYPE h264e_prc_prepare_to_transfer(void *ap_obj, OMX_U32 a_pid)
 {
-    h264e_prc_t *p_prc = ap_obj;
+   h264e_prc_t *p_prc = ap_obj;
 
-    assert (p_prc);
+   assert(p_prc);
 
-    init_port_structs (p_prc);
+   init_port_structs(p_prc);
 
-    p_prc->eos_ = false;
+   p_prc->eos_ = false;
 
-    /* from vid_enc_MessageHandler */
-    struct pipe_video_codec templat = {};
+   /* from vid_enc_MessageHandler */
+   struct pipe_video_codec templat = {};
 
-    templat.profile = enc_TranslateOMXProfileToPipe(p_prc->profile_level.eProfile);
-    templat.level = enc_TranslateOMXLevelToPipe(p_prc->profile_level.eLevel);
-    templat.entrypoint = PIPE_VIDEO_ENTRYPOINT_ENCODE;
-    templat.chroma_format = PIPE_VIDEO_CHROMA_FORMAT_420;
-    templat.width = p_prc->scale_buffer[p_prc->current_scale_buffer] ?
-                       p_prc->scale.xWidth : p_prc->in_port_def_.format.video.nFrameWidth;
-    templat.height = p_prc->scale_buffer[p_prc->current_scale_buffer] ?
-                       p_prc->scale.xHeight : p_prc->in_port_def_.format.video.nFrameHeight;
+   templat.profile = enc_TranslateOMXProfileToPipe(p_prc->profile_level.eProfile);
+   templat.level = enc_TranslateOMXLevelToPipe(p_prc->profile_level.eLevel);
+   templat.entrypoint = PIPE_VIDEO_ENTRYPOINT_ENCODE;
+   templat.chroma_format = PIPE_VIDEO_CHROMA_FORMAT_420;
+   templat.width = p_prc->scale_buffer[p_prc->current_scale_buffer] ?
+                     p_prc->scale.xWidth : p_prc->in_port_def_.format.video.nFrameWidth;
+   templat.height = p_prc->scale_buffer[p_prc->current_scale_buffer] ?
+                      p_prc->scale.xHeight : p_prc->in_port_def_.format.video.nFrameHeight;
 
-    if (templat.profile == PIPE_VIDEO_PROFILE_MPEG4_AVC_BASELINE) {
-       struct pipe_screen *screen = p_prc->screen->pscreen;
-       templat.max_references = 1;
-       p_prc->stacked_frames_num =
-       screen->get_video_param(screen,
-                               PIPE_VIDEO_PROFILE_MPEG4_AVC_HIGH,
-                               PIPE_VIDEO_ENTRYPOINT_ENCODE,
-                               PIPE_VIDEO_CAP_STACKED_FRAMES);
-    } else {
-        templat.max_references = OMX_VID_ENC_P_PERIOD_DEFAULT;
-        p_prc->stacked_frames_num = 1;
-    }
-    p_prc->codec = p_prc->s_pipe->create_video_codec(p_prc->s_pipe, &templat);
+   if (templat.profile == PIPE_VIDEO_PROFILE_MPEG4_AVC_BASELINE) {
+      struct pipe_screen *screen = p_prc->screen->pscreen;
+      templat.max_references = 1;
+      p_prc->stacked_frames_num =
+      screen->get_video_param(screen,
+                              PIPE_VIDEO_PROFILE_MPEG4_AVC_HIGH,
+                              PIPE_VIDEO_ENTRYPOINT_ENCODE,
+                              PIPE_VIDEO_CAP_STACKED_FRAMES);
+   } else {
+      templat.max_references = OMX_VID_ENC_P_PERIOD_DEFAULT;
+      p_prc->stacked_frames_num = 1;
+   }
+   p_prc->codec = p_prc->s_pipe->create_video_codec(p_prc->s_pipe, &templat);
 
-    return OMX_ErrorNone;
+   return OMX_ErrorNone;
 }
 
-static OMX_ERRORTYPE h264e_prc_transfer_and_process (void *ap_obj, OMX_U32 a_pid)
+static OMX_ERRORTYPE h264e_prc_transfer_and_process(void *ap_obj, OMX_U32 a_pid)
 {
-    return OMX_ErrorNone;
+   return OMX_ErrorNone;
 }
 
-static OMX_ERRORTYPE h264e_prc_stop_and_return (void *ap_obj)
+static OMX_ERRORTYPE h264e_prc_stop_and_return(void *ap_obj)
 {
-    h264e_prc_t *p_prc = (h264e_prc_t *) ap_obj;
-    return h264e_release_all_headers (p_prc);
+   h264e_prc_t *p_prc = (h264e_prc_t *) ap_obj;
+   return h264e_release_all_headers(p_prc);
 }
 
-static OMX_ERRORTYPE h264e_prc_buffers_ready (const void *ap_obj)
+static OMX_ERRORTYPE h264e_prc_buffers_ready(const void *ap_obj)
 {
-    h264e_prc_t *p_prc = (h264e_prc_t *) ap_obj;
-    OMX_BUFFERHEADERTYPE *in_buf = NULL;
-    OMX_BUFFERHEADERTYPE *out_buf = NULL;
-    OMX_ERRORTYPE r = OMX_ErrorNone;
+   h264e_prc_t *p_prc = (h264e_prc_t *) ap_obj;
+   OMX_BUFFERHEADERTYPE *in_buf = NULL;
+   OMX_BUFFERHEADERTYPE *out_buf = NULL;
+   OMX_ERRORTYPE r = OMX_ErrorNone;
 
-    assert(p_prc);
+   assert(p_prc);
 
-    /* Don't get input buffer if output buffer not found */
-    while (!p_prc->eos_ && (out_buf = get_output_buffer(p_prc)) && (in_buf = get_input_buffer(p_prc))) {
-        if (!p_prc->out_port_disabled_) {
-           r = encode_frame(p_prc, in_buf);
-        }
-    }
+   /* Don't get input buffer if output buffer not found */
+   while (!p_prc->eos_ && (out_buf = get_output_buffer(p_prc)) && (in_buf = get_input_buffer(p_prc))) {
+      if (!p_prc->out_port_disabled_) {
+         r = encode_frame(p_prc, in_buf);
+      }
+   }
 
-    return r;
+   return r;
 }
 
-static OMX_ERRORTYPE h264e_prc_port_flush (const void *ap_obj, OMX_U32 a_pid)
+static OMX_ERRORTYPE h264e_prc_port_flush(const void *ap_obj, OMX_U32 a_pid)
 {
-    h264e_prc_t *p_prc = (h264e_prc_t *) ap_obj;
-    if (OMX_ALL == a_pid || OMX_VID_ENC_AVC_INPUT_PORT_INDEX == a_pid) {
-        release_input_header (p_prc);
-        reset_stream_parameters (p_prc);
-    }
-    if (OMX_ALL == a_pid || OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX == a_pid) {
-        release_output_header (p_prc);
-    }
-    return OMX_ErrorNone;
+   h264e_prc_t *p_prc = (h264e_prc_t *) ap_obj;
+   if (OMX_ALL == a_pid || OMX_VID_ENC_AVC_INPUT_PORT_INDEX == a_pid) {
+      release_input_header(p_prc);
+      reset_stream_parameters(p_prc);
+   }
+   if (OMX_ALL == a_pid || OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX == a_pid) {
+      release_output_header(p_prc);
+   }
+   return OMX_ErrorNone;
 }
 
-static OMX_ERRORTYPE h264e_prc_port_disable (const void *ap_obj, OMX_U32 a_pid)
+static OMX_ERRORTYPE h264e_prc_port_disable(const void *ap_obj, OMX_U32 a_pid)
 {
-    h264e_prc_t *p_prc = (h264e_prc_t *) ap_obj;
-    assert (p_prc);
-    if (OMX_ALL == a_pid || OMX_VID_ENC_AVC_INPUT_PORT_INDEX == a_pid) {
-        /* Release all buffers */
-        h264e_release_all_headers (p_prc);
-        reset_stream_parameters(p_prc);
-        p_prc->in_port_disabled_ = true;
-    }
-    if (OMX_ALL == a_pid || OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX == a_pid) {
-        release_output_header (p_prc);
-        p_prc->out_port_disabled_ = true;
-    }
-    return OMX_ErrorNone;
+   h264e_prc_t *p_prc = (h264e_prc_t *) ap_obj;
+   assert(p_prc);
+   if (OMX_ALL == a_pid || OMX_VID_ENC_AVC_INPUT_PORT_INDEX == a_pid) {
+      /* Release all buffers */
+      h264e_release_all_headers(p_prc);
+      reset_stream_parameters(p_prc);
+      p_prc->in_port_disabled_ = true;
+   }
+   if (OMX_ALL == a_pid || OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX == a_pid) {
+      release_output_header(p_prc);
+      p_prc->out_port_disabled_ = true;
+   }
+   return OMX_ErrorNone;
 }
 
-static OMX_ERRORTYPE h264e_prc_port_enable (const void *ap_obj, OMX_U32 a_pid)
+static OMX_ERRORTYPE h264e_prc_port_enable(const void *ap_obj, OMX_U32 a_pid)
 {
-    h264e_prc_t * p_prc = (h264e_prc_t *) ap_obj;
-    assert (p_prc);
-    if (OMX_ALL == a_pid || OMX_VID_ENC_AVC_INPUT_PORT_INDEX == a_pid) {
-        if (p_prc->in_port_disabled_) {
-            reset_stream_parameters (p_prc);
-            p_prc->in_port_disabled_ = false;
-        }
-    }
-    if (OMX_ALL == a_pid || OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX == a_pid) {
-        p_prc->out_port_disabled_ = false;
-    }
-    return OMX_ErrorNone;
+   h264e_prc_t * p_prc = (h264e_prc_t *) ap_obj;
+   assert(p_prc);
+   if (OMX_ALL == a_pid || OMX_VID_ENC_AVC_INPUT_PORT_INDEX == a_pid) {
+      if (p_prc->in_port_disabled_) {
+         reset_stream_parameters(p_prc);
+         p_prc->in_port_disabled_ = false;
+      }
+   }
+   if (OMX_ALL == a_pid || OMX_VID_ENC_AVC_OUTPUT_PORT_INDEX == a_pid) {
+      p_prc->out_port_disabled_ = false;
+   }
+   return OMX_ErrorNone;
 }
 
 /*
  * h264e_prc_class
  */
 
-static void * h264e_prc_class_ctor (void *ap_obj, va_list * app)
+static void * h264e_prc_class_ctor(void *ap_obj, va_list * app)
 {
-    /* NOTE: Class methods might be added in the future. None for now. */
-    return super_ctor (typeOf (ap_obj, "h264eprc_class"), ap_obj, app);
+   /* NOTE: Class methods might be added in the future. None for now. */
+   return super_ctor(typeOf(ap_obj, "h264eprc_class"), ap_obj, app);
 }
 
 /*
  * initialization
  */
 
-void * h264e_prc_class_init (void * ap_tos, void * ap_hdl)
+void * h264e_prc_class_init(void * ap_tos, void * ap_hdl)
 {
-    void * tizprc = tiz_get_type (ap_hdl, "tizprc");
-    void * h264eprc_class = factory_new
-        /* TIZ_CLASS_COMMENT: class type, class name, parent, size */
-        (classOf (tizprc), "h264eprc_class", classOf (tizprc),
-         sizeof (h264e_prc_class_t),
-         /* TIZ_CLASS_COMMENT: */
-         ap_tos, ap_hdl,
-         /* TIZ_CLASS_COMMENT: class constructor */
-         ctor, h264e_prc_class_ctor,
-         /* TIZ_CLASS_COMMENT: stop value*/
-         0);
-    return h264eprc_class;
+   void * tizprc = tiz_get_type(ap_hdl, "tizprc");
+   void * h264eprc_class = factory_new
+      /* TIZ_CLASS_COMMENT: class type, class name, parent, size */
+      (classOf(tizprc), "h264eprc_class", classOf(tizprc),
+       sizeof(h264e_prc_class_t),
+       /* TIZ_CLASS_COMMENT: */
+       ap_tos, ap_hdl,
+       /* TIZ_CLASS_COMMENT: class constructor */
+       ctor, h264e_prc_class_ctor,
+       /* TIZ_CLASS_COMMENT: stop value*/
+       0);
+   return h264eprc_class;
 }
 
-void * h264e_prc_init (void * ap_tos, void * ap_hdl)
+void * h264e_prc_init(void * ap_tos, void * ap_hdl)
 {
-    void * tizprc = tiz_get_type (ap_hdl, "tizprc");
-    void * h264eprc_class = tiz_get_type (ap_hdl, "h264eprc_class");
-    TIZ_LOG_CLASS (h264eprc_class);
-    void * h264eprc = factory_new
+   void * tizprc = tiz_get_type(ap_hdl, "tizprc");
+   void * h264eprc_class = tiz_get_type(ap_hdl, "h264eprc_class");
+   TIZ_LOG_CLASS (h264eprc_class);
+   void * h264eprc = factory_new
       /* TIZ_CLASS_COMMENT: class type, class name, parent, size */
-      (h264eprc_class, "h264eprc", tizprc, sizeof (h264e_prc_t),
+      (h264eprc_class, "h264eprc", tizprc, sizeof(h264e_prc_t),
        /* TIZ_CLASS_COMMENT: */
        ap_tos, ap_hdl,
        /* TIZ_CLASS_COMMENT: class constructor */
@@ -976,5 +961,5 @@ void * h264e_prc_init (void * ap_tos, void * ap_hdl)
        /* TIZ_CLASS_COMMENT: stop value*/
        0);
 
-    return h264eprc;
+   return h264eprc;
 }
