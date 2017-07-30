@@ -18,7 +18,7 @@ struct output_buf_private {
    struct pipe_transfer *transfer;
 };
 
-h264e_prc_t * get_prc_from_handle (OMX_HANDLETYPE ap_hdl);
+h264e_prc_t * get_prc_from_handle(OMX_HANDLETYPE ap_hdl);
 void enc_ReleaseTasks(struct list_head *head);
 
 #endif
