@@ -5,8 +5,6 @@
 #include <tizonia/OMX_Types.h>
 #include <tizonia/OMX_Video.h>
 
-#define OMX_VID_ENC_BASE_NAME "OMX.mesa.video_encoder"
-#define OMX_VID_ENC_AVC_NAME "OMX.mesa.video_encoder.avc"
 #define OMX_VID_ENC_AVC_ROLE "video_encoder.avc"
 
 /* With libtizonia, port indexes must start at index 0 */
@@ -15,13 +13,12 @@
 #define OMX_VID_ENC_AVC_DEFAULT_FRAME_WIDTH 176
 #define OMX_VID_ENC_AVC_DEFAULT_FRAME_HEIGHT 144
 #define OMX_VID_ENC_AVC_INPUT_PORT_MIN_BUF_COUNT 8
-#define OMX_VID_ENC_AVC_OUTPUT_PORT_MIN_BUF_COUNT 2 /* Confirm count */
-#define OMX_VID_ENC_AVC_PORT_MIN_INPUT_BUF_SIZE 4 * 1024 /* Confirm size */
-#define OMX_VID_ENC_AVC_PORT_MIN_OUTPUT_BUF_SIZE 345600 /* Confirm size */
+#define OMX_VID_ENC_AVC_OUTPUT_PORT_MIN_BUF_COUNT 2
+#define OMX_VID_ENC_AVC_PORT_MIN_INPUT_BUF_SIZE 4 * 1024
+#define OMX_VID_ENC_AVC_PORT_MIN_OUTPUT_BUF_SIZE 345600
 #define OMX_VID_ENC_AVC_PORT_NONCONTIGUOUS OMX_FALSE
 #define OMX_VID_ENC_AVC_PORT_ALIGNMENT 0
-#define OMX_VID_ENC_AVC_PORT_SUPPLIERPREF OMX_BufferSupplyInput /* Confirm value */
-#define OMX_VID_ENC_AVC_TIMESTAMP_INVALID ((OMX_TICKS) -1)
+#define OMX_VID_ENC_AVC_PORT_SUPPLIERPREF OMX_BufferSupplyInput
 
 #define OMX_VID_ENC_BITRATE_MIN 64000
 #define OMX_VID_ENC_BITRATE_MEDIAN 2000000
@@ -35,9 +32,9 @@
 #define OMX_VID_ENC_IDR_PERIOD_DEFAULT 1000
 #define OMX_VID_ENC_P_PERIOD_DEFAULT 3
 
-OMX_PTR instantiate_h264e_config_port (OMX_HANDLETYPE ap_hdl);
-OMX_PTR instantiate_h264e_input_port (OMX_HANDLETYPE ap_hdl);
-OMX_PTR instantiate_h264e_output_port (OMX_HANDLETYPE ap_hdl);
-OMX_PTR instantiate_h264e_processor (OMX_HANDLETYPE ap_hdl);
+OMX_PTR instantiate_h264e_config_port(OMX_HANDLETYPE ap_hdl);
+OMX_PTR instantiate_h264e_input_port(OMX_HANDLETYPE ap_hdl);
+OMX_PTR instantiate_h264e_output_port(OMX_HANDLETYPE ap_hdl);
+OMX_PTR instantiate_h264e_processor(OMX_HANDLETYPE ap_hdl);
 
 #endif                          /* H264E_H */
