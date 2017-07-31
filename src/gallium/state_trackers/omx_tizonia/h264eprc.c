@@ -167,7 +167,6 @@ static OMX_ERRORTYPE h264e_buffer_emptied(h264e_prc_t * p_prc, OMX_BUFFERHEADERT
    assert(p_prc->p_inhdr_ == p_hdr);
 
    if (!p_prc->out_port_disabled_) {
-      assert(p_hdr->nFilledLen == 0);
       p_hdr->nOffset = 0;
 
       if ((p_hdr->nFlags & OMX_BUFFERFLAG_EOS) != 0) {
@@ -671,10 +670,11 @@ static OMX_ERRORTYPE encode_frame(h264e_prc_t * p_prc, OMX_BUFFERHEADERTYPE * in
       enc_MoveTasks(&p_prc->b_frames, &inp->tasks);
    }
 
-   if (LIST_IS_EMPTY(&inp->tasks))
+   if (LIST_IS_EMPTY(&inp->tasks)) {
       return h264e_buffer_emptied(p_prc, in_buf);
-   else
+   } else {
       return h264e_manage_buffers(p_prc);
+   }
 }
 
 /*
