@@ -7,6 +7,7 @@
 
 #define OMX_VID_DEC_AVC_DEFAULT_FRAME_WIDTH      176
 #define OMX_VID_DEC_AVC_DEFAULT_FRAME_HEIGHT     144
+#define OMX_VID_DEC_AVC_DEFAULT_FRAME_RATE 15<<16
 #define OMX_VID_DEC_AVC_ROLE "video_decoder.avc"
 /* With libtizonia, port indexes must start at index 0 */
 #define OMX_VID_DEC_AVC_INPUT_PORT_INDEX               0
