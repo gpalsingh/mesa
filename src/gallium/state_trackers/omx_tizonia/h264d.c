@@ -55,7 +55,7 @@ OMX_PTR instantiate_h264d_input_port(OMX_HANDLETYPE ap_hdl)
    portdef.nStride = 0;
    portdef.nSliceHeight = 0;
    portdef.nBitrate = 64000;
-   portdef.xFramerate = 15;
+   portdef.xFramerate = OMX_VID_DEC_AVC_DEFAULT_FRAME_RATE;
    portdef.bFlagErrorConcealment = OMX_FALSE;
    portdef.eCompressionFormat = OMX_VIDEO_CodingAVC;
    portdef.eColorFormat = OMX_COLOR_FormatUnused;
@@ -125,7 +125,7 @@ OMX_PTR instantiate_h264d_output_port(OMX_HANDLETYPE ap_hdl)
    portdef.nStride = 0;
    portdef.nSliceHeight = 0;
    portdef.nBitrate = 64000;
-   portdef.xFramerate = 15;
+   portdef.xFramerate = OMX_VID_DEC_AVC_DEFAULT_FRAME_RATE;
    portdef.bFlagErrorConcealment = OMX_FALSE;
    portdef.eCompressionFormat = OMX_VIDEO_CodingUnused;
    portdef.eColorFormat = OMX_COLOR_FormatYUV420SemiPlanar;
