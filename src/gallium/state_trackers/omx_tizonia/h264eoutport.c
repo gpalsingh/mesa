@@ -53,15 +53,16 @@ static OMX_ERRORTYPE h264e_outport_FreeBuffer(const void * ap_obj, OMX_HANDLETYP
                                               OMX_U32 idx, OMX_BUFFERHEADERTYPE *buf)
 {
    h264e_prc_t *p_prc = tiz_get_prc(ap_hdl);
-   struct input_buf_private *inp = buf->pOutputPortPrivate;
+   struct output_buf_private *outp = buf->pOutputPortPrivate;
 
-   if (inp) {
-      enc_ReleaseTasks(&inp->tasks);
-      if (inp->transfer)
-         pipe_transfer_unmap(p_prc->s_pipe, inp->transfer);
-      pipe_resource_reference(&inp->resource, NULL);
-      FREE(inp);
+   if (outp) {
+      if (outp->transfer)
+         pipe_transfer_unmap(p_prc->t_pipe, outp->transfer);
+      pipe_resource_reference(&outp->bitstream, NULL);
+      FREE(outp);
+      buf->pOutputPortPrivate = NULL;
    }
+   buf->pBuffer = NULL;
 
    return super_FreeBuffer(typeOf(ap_obj, "h264eoutport"), ap_obj, ap_hdl, idx, buf);
 }
