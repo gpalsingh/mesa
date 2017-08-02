@@ -1380,8 +1380,10 @@ static void h264d_deint(h264d_prc_t *p_prc, struct pipe_video_buffer *src_buf,
 static void h264d_fill_output(h264d_prc_t *p_prc, struct pipe_video_buffer *buf,
                               OMX_BUFFERHEADERTYPE* output)
 {
-   tiz_port_t *port = tiz_krn_get_port(tiz_get_krn(handleOf(p_prc)), OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX);
-   OMX_VIDEO_PORTDEFINITIONTYPE *def = &port->portdef_.format.video;
+   tiz_port_t *out_port = tiz_krn_get_port(tiz_get_krn(handleOf(p_prc)), OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX);
+   OMX_VIDEO_PORTDEFINITIONTYPE *def = &out_port->portdef_.format.video;
+   tiz_port_t *in_port = tiz_krn_get_port(tiz_get_krn(handleOf(p_prc)), OMX_VID_DEC_AVC_INPUT_PORT_INDEX);
+   OMX_VIDEO_PORTDEFINITIONTYPE *in_port_def = &in_port->portdef_.format.video;
 
    struct pipe_sampler_view **views;
    unsigned i, j;
@@ -1392,8 +1394,11 @@ static void h264d_fill_output(h264d_prc_t *p_prc, struct pipe_video_buffer *buf,
    if (!output->pBuffer) {
       struct pipe_video_buffer *dst_buf = NULL;
       struct pipe_surface **dst_surface = NULL;
+      struct u_rect src_rect;
+      struct u_rect dst_rect;
       struct vl_compositor *compositor = &p_prc->compositor;
       struct vl_compositor_state *s = &p_prc->cstate;
+      enum vl_compositor_deinterlace deinterlace = VL_COMPOSITOR_WEAVE;
 
       /* Write into the current eglimage using
       * the unique decoder target NV12 */
@@ -1406,25 +1411,21 @@ static void h264d_fill_output(h264d_prc_t *p_prc, struct pipe_video_buffer *buf,
       views = buf->get_sampler_view_planes(buf);
       assert(views);
 
-      vl_compositor_clear_layers(s);
+      src_rect.x0 = 0;
+      src_rect.y0 = 0;
+      src_rect.x1 = def->nFrameWidth;
+      src_rect.y1 = def->nFrameHeight;
 
-      // TODO: not sure of the exactitude of this sequence but the
-      // right solution should be close to that.
-      for (i = 0; i < VL_MAX_SURFACES; ++i) {
-         struct u_rect src_rect;
-         if (!views[i] || !dst_surface[i])
-            continue;
-         src_rect.x0 = 0;
-         src_rect.y0 = 0;
-         src_rect.x1 = def->nFrameWidth;
-         src_rect.y1 = def->nFrameHeight;
-         if (i > 0) {
-            src_rect.x1 /= 2;
-             src_rect.y1 /= 2;
-         }
-         vl_compositor_set_rgba_layer(s, compositor, 0, views[i], &src_rect, NULL, NULL);
-         vl_compositor_render(s, compositor, dst_surface[i], NULL, false);
-      }
+      dst_rect.x0 = 0;
+      dst_rect.y0 = 0;
+      dst_rect.x1 = in_port_def->nFrameWidth;
+      dst_rect.y1 = in_port_def->nFrameHeight;
+
+      vl_compositor_clear_layers(s);
+      vl_compositor_set_buffer_layer(s, compositor, 0, buf,
+              &src_rect, NULL, deinterlace);
+      vl_compositor_set_layer_dst_area(s, 0, &dst_rect);
+      vl_compositor_render(s, compositor, dst_surface[0], NULL, false);
 
       p_prc->pipe->flush(p_prc->pipe, NULL, 0);
 
