@@ -592,7 +592,8 @@ static OMX_ERRORTYPE update_port_parameters(h264d_prc_t * p_prc) {
    i_def = &(p_prc->stream_info);
 
    unsigned framesize = i_def->width * i_def->height;
-
+   p_prc->in_port_def_.format.video.nFrameWidth = i_def->width;
+   p_prc->in_port_def_.format.video.nFrameHeight = i_def->height;
    p_prc->in_port_def_.nBufferSize = framesize * 512 / (16*16);
 
    tiz_check_omx(tiz_krn_SetParameter_internal(
