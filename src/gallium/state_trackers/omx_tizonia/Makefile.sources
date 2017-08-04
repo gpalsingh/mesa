@@ -6,6 +6,9 @@ C_SOURCES := \
 	h264dprc.c \
 	h264dprc.h \
 	h264dprc_decls.h \
+	h264dinport.c \
+	h264dinport.h \
+	h264dinport_decls.h \
 	h264e.c \
 	h264e.h \
 	h264eprc.c \
