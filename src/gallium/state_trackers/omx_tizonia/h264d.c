@@ -114,7 +114,7 @@ OMX_PTR instantiate_h264d_input_port(OMX_HANDLETYPE ap_hdl)
    avctype.nCabacInitIdc = 0;
    avctype.eLoopFilterMode = OMX_VIDEO_AVCLoopFilterEnable;
 
-   return factory_new (tiz_get_type(ap_hdl, "tizavcport"),
+   return factory_new (tiz_get_type(ap_hdl, "h264dinport"),
                        &avc_port_opts, &portdef,
                        &encodings, &formats, &avctype, &levels,
                        NULL  /* OMX_VIDEO_PARAM_BITRATETYPE */);
