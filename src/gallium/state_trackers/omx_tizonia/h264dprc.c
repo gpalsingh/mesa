@@ -1342,7 +1342,6 @@ static void reset_stream_parameters(h264d_prc_t * ap_prc)
                             OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX);
    ap_prc->p_inhdr_ = 0;
    ap_prc->num_in_buffers = 0;
-   ap_prc->p_outhdr_ = 0;
    ap_prc->first_buf_in_frame = true;
    ap_prc->eos_ = false;
    ap_prc->frame_finished = false;
