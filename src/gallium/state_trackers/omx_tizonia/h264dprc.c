@@ -587,6 +587,7 @@ static void seq_parameter_set(h264d_prc_t *p_prc, struct vl_rbsp *rbsp)
 static OMX_ERRORTYPE update_port_parameters(h264d_prc_t * p_prc) {
    OMX_VIDEO_PORTDEFINITIONTYPE * p_def = NULL;   /* Output port info */
    h264d_stream_info_t * i_def = NULL; /* Info read from stream */
+   OMX_ERRORTYPE err = OMX_ErrorNone;
 
    p_def = &(p_prc->out_port_def_.format.video);
    i_def = &(p_prc->stream_info);
@@ -625,7 +626,7 @@ static OMX_ERRORTYPE update_port_parameters(h264d_prc_t * p_prc) {
                         OMX_IndexParamPortDefinition,
                         NULL);
 
-   return OMX_ErrorNone;
+   return err;
 }
 
 static void picture_parameter_set(h264d_prc_t *p_prc, struct vl_rbsp *rbsp)
