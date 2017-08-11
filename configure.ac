@@ -2205,7 +2205,7 @@ if test -n "$with_gallium_drivers" -a "x$with_gallium_drivers" != xswrast; then
     fi
 
     if test "x$enable_omx_tizonia -a "x$have_omx_platform" = xyes" = xauto; then
-	PKG_CHECK_EXISTS([libtizonia >= $LIBOMXIL_TIZONIA_REQUIRED], [enable_omx_tizonia=yes], [enable_omx_tizonia=no])
+       PKG_CHECK_EXISTS([libtizonia >= $LIBOMXIL_TIZONIA_REQUIRED], [enable_omx_tizonia=yes], [enable_omx_tizonia=no])
     fi
 
     if test "x$enable_va" = xauto -a "x$have_va_platform" = xyes; then
