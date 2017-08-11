@@ -62,7 +62,6 @@ struct h264d_prc
    OMX_BUFFERHEADERTYPE *in_buffers[2];
    OMX_BUFFERHEADERTYPE *p_inhdr_;
    OMX_BUFFERHEADERTYPE *p_outhdr_;
-   OMX_PARAM_PORTDEFINITIONTYPE in_port_def_;
    OMX_PARAM_PORTDEFINITIONTYPE out_port_def_;
    const void *inputs[2];
    unsigned sizes[2];

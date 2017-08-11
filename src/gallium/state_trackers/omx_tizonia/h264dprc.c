@@ -589,42 +589,37 @@ static OMX_ERRORTYPE update_port_parameters(h264d_prc_t * p_prc) {
    h264d_stream_info_t * i_def = NULL; /* Info read from stream */
    OMX_ERRORTYPE err = OMX_ErrorNone;
 
+   assert(p_prc);
+
    p_def = &(p_prc->out_port_def_.format.video);
    i_def = &(p_prc->stream_info);
 
-   /* Make changes only if there is a resolution change */
-   if ((p_prc->in_port_def_.format.video.nFrameWidth == i_def->width) &&
-       (align(p_prc->in_port_def_.format.video.nFrameHeight, 0x10) == i_def->height))
+   /* Handle dynamic resolution change */
+   if ((p_def->nFrameWidth == i_def->width) && (align(p_def->nFrameHeight, 0x10) == i_def->height))
       return err;
-
-   unsigned framesize = i_def->width * i_def->height;
-   p_prc->in_port_def_.format.video.nFrameWidth = i_def->width;
-   p_prc->in_port_def_.format.video.nFrameHeight = i_def->height;
-   p_prc->in_port_def_.nBufferSize = framesize * 512 / (16*16);
-
-   tiz_check_omx(tiz_krn_SetParameter_internal(
-      tiz_get_krn(handleOf(p_prc)), handleOf(p_prc),
-      OMX_IndexParamPortDefinition, &(p_prc->in_port_def_)));
-
-   tiz_srv_issue_event((OMX_PTR) p_prc, OMX_EventPortSettingsChanged,
-                        OMX_VID_DEC_AVC_INPUT_PORT_INDEX,
-                        OMX_IndexParamPortDefinition,
-                        NULL);
 
    p_def->nFrameWidth = i_def->width;
    p_def->nFrameHeight = i_def->height;
    p_def->nStride = i_def->width;
    p_def->nSliceHeight = i_def->height;
-   p_prc->out_port_def_.nBufferSize = framesize*3/2;
 
-   tiz_check_omx(tiz_krn_SetParameter_internal(
-      tiz_get_krn(handleOf(p_prc)), handleOf(p_prc),
-      OMX_IndexParamPortDefinition, &(p_prc->out_port_def_)));
+   err = tiz_krn_SetParameter_internal(tiz_get_krn(handleOf(p_prc)), handleOf(p_prc),
+                                       OMX_IndexParamPortDefinition, &(p_prc->out_port_def_));
+   if (err == OMX_ErrorNone) {
+      tiz_port_t * p_obj = tiz_krn_get_port(tiz_get_krn(handleOf(p_prc)), OMX_VID_DEC_AVC_INPUT_PORT_INDEX);
 
-   tiz_srv_issue_event((OMX_PTR) p_prc, OMX_EventPortSettingsChanged,
-                        OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX,
-                        OMX_IndexParamPortDefinition,
-                        NULL);
+      /* Set desired buffer size that will be used when allocating input buffers */
+      p_obj->portdef_.nBufferSize = p_def->nFrameWidth * p_def->nFrameHeight * 512 / (16*16);
+
+      /* Get a locally copy of port def. Useful for the early return above */
+      tiz_check_omx(tiz_api_GetParameter(tiz_get_krn(handleOf(p_prc)), handleOf(p_prc),
+                                         OMX_IndexParamPortDefinition, &(p_prc->out_port_def_)));
+
+      tiz_srv_issue_event((OMX_PTR) p_prc, OMX_EventPortSettingsChanged,
+                          OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX,
+                          OMX_IndexParamPortDefinition,
+                          NULL);
+   }
 
    return err;
 }
@@ -1228,16 +1223,14 @@ static void h264d_begin_frame(h264d_prc_t *p_prc)
    /* Set codec if not already set */
    if (!p_prc->codec) {
       struct pipe_video_codec templat = {};
-      tiz_port_t * port;  //Possibly a better way to do this exists
-      port = tiz_krn_get_port(tiz_get_krn(handleOf(p_prc)), OMX_VID_DEC_AVC_INPUT_PORT_INDEX);
 
       templat.profile = p_prc->profile;
       templat.entrypoint = PIPE_VIDEO_ENTRYPOINT_BITSTREAM;
       templat.chroma_format = PIPE_VIDEO_CHROMA_FORMAT_420;
       templat.max_references = p_prc->picture.h264.num_ref_frames;
       templat.expect_chunked_decode = true;
-      templat.width = port->portdef_.format.video.nFrameWidth;
-      templat.height = port->portdef_.format.video.nFrameHeight;
+      templat.width = p_prc->out_port_def_.format.video.nFrameWidth;
+      templat.height = p_prc->out_port_def_.format.video.nFrameHeight;
       templat.level = p_prc->picture.h264.pps->sps->level_idc;
 
       p_prc->codec = p_prc->pipe->create_video_codec(p_prc->pipe, &templat);
@@ -1342,13 +1335,8 @@ static void decode_buffer(h264d_prc_t *p_prc, struct vl_vlc *vlc, unsigned min_b
 static void reset_stream_parameters(h264d_prc_t * ap_prc)
 {
    assert(ap_prc);
-   TIZ_INIT_OMX_PORT_STRUCT(ap_prc->in_port_def_,
-                            OMX_VID_DEC_AVC_INPUT_PORT_INDEX);
    TIZ_INIT_OMX_PORT_STRUCT(ap_prc->out_port_def_,
                             OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX);
-
-   tiz_api_GetParameter (tiz_get_krn (handleOf (ap_prc)), handleOf (ap_prc),
-                          OMX_IndexParamPortDefinition, &(ap_prc->in_port_def_));
 
    tiz_api_GetParameter (tiz_get_krn (handleOf (ap_prc)), handleOf (ap_prc),
                           OMX_IndexParamPortDefinition, &(ap_prc->out_port_def_));
@@ -1395,8 +1383,6 @@ static void h264d_fill_output(h264d_prc_t *p_prc, struct pipe_video_buffer *buf,
 {
    tiz_port_t *out_port = tiz_krn_get_port(tiz_get_krn(handleOf(p_prc)), OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX);
    OMX_VIDEO_PORTDEFINITIONTYPE *def = &out_port->portdef_.format.video;
-   tiz_port_t *in_port = tiz_krn_get_port(tiz_get_krn(handleOf(p_prc)), OMX_VID_DEC_AVC_INPUT_PORT_INDEX);
-   OMX_VIDEO_PORTDEFINITIONTYPE *in_port_def = &in_port->portdef_.format.video;
 
    struct pipe_sampler_view **views;
    unsigned i, j;
@@ -1431,8 +1417,8 @@ static void h264d_fill_output(h264d_prc_t *p_prc, struct pipe_video_buffer *buf,
 
       dst_rect.x0 = 0;
       dst_rect.y0 = 0;
-      dst_rect.x1 = in_port_def->nFrameWidth;
-      dst_rect.y1 = in_port_def->nFrameHeight;
+      dst_rect.x1 = def->nFrameWidth;
+      dst_rect.y1 = def->nFrameHeight;
 
       vl_compositor_clear_layers(s);
       vl_compositor_set_buffer_layer(s, compositor, 0, buf,
@@ -1701,12 +1687,6 @@ static OMX_ERRORTYPE h264d_prc_prepare_to_transfer(void *ap_obj, OMX_U32 a_pid)
 {
    h264d_prc_t *p_prc = ap_obj;
    assert(p_prc);
-
-   TIZ_INIT_OMX_PORT_STRUCT(p_prc->in_port_def_,
-                            OMX_VID_DEC_AVC_INPUT_PORT_INDEX);
-   tiz_check_omx(
-      tiz_api_GetParameter(tiz_get_krn(handleOf(p_prc)), handleOf(p_prc),
-                           OMX_IndexParamPortDefinition, &(p_prc->in_port_def_)));
 
    TIZ_INIT_OMX_PORT_STRUCT(p_prc->out_port_def_,
                             OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX);

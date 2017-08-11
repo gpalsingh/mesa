@@ -59,15 +59,19 @@ static OMX_ERRORTYPE h264d_inport_SetParameter(const void * ap_obj, OMX_HANDLETY
 {
    OMX_ERRORTYPE err = OMX_ErrorNone;
 
+   assert(ap_obj);
+   assert(ap_hdl);
+   assert(ap_struct);
+
    if (a_index == OMX_IndexParamPortDefinition) {
       h264d_prc_t * p_prc = tiz_get_prc(ap_hdl);
       OMX_VIDEO_PORTDEFINITIONTYPE * p_def = &(p_prc->out_port_def_.format.video);
       OMX_PARAM_PORTDEFINITIONTYPE * i_def = (OMX_PARAM_PORTDEFINITIONTYPE *) ap_struct;
 
       /* Make changes only if there is a resolution change */
-      if ((p_prc->in_port_def_.format.video.nFrameWidth == i_def->format.video.nFrameWidth) &&
-          (p_prc->in_port_def_.format.video.nFrameHeight == i_def->format.video.nFrameHeight) &&
-          (p_prc->in_port_def_.format.video.eCompressionFormat == i_def->format.video.eCompressionFormat))
+      if ((p_def->nFrameWidth == i_def->format.video.nFrameWidth) &&
+          (p_def->nFrameHeight == i_def->format.video.nFrameHeight) &&
+          (p_def->eCompressionFormat == i_def->format.video.eCompressionFormat))
          return err;
 
       /* Set some default values if not set */
@@ -86,7 +90,7 @@ static OMX_ERRORTYPE h264d_inport_SetParameter(const void * ap_obj, OMX_HANDLETY
 
          /* Get a locally copy of port def. Useful for the early return above */
          tiz_check_omx(tiz_api_GetParameter(tiz_get_krn(handleOf(p_prc)), handleOf(p_prc),
-                       OMX_IndexParamPortDefinition, &(p_prc->in_port_def_)));
+                       OMX_IndexParamPortDefinition, &(p_prc->out_port_def_)));
       }
    }
 
