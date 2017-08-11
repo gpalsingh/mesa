@@ -1346,6 +1346,13 @@ static void reset_stream_parameters(h264d_prc_t * ap_prc)
                             OMX_VID_DEC_AVC_INPUT_PORT_INDEX);
    TIZ_INIT_OMX_PORT_STRUCT(ap_prc->out_port_def_,
                             OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX);
+
+   tiz_api_GetParameter (tiz_get_krn (handleOf (ap_prc)), handleOf (ap_prc),
+                          OMX_IndexParamPortDefinition, &(ap_prc->in_port_def_));
+
+   tiz_api_GetParameter (tiz_get_krn (handleOf (ap_prc)), handleOf (ap_prc),
+                          OMX_IndexParamPortDefinition, &(ap_prc->out_port_def_));
+
    ap_prc->p_inhdr_ = 0;
    ap_prc->num_in_buffers = 0;
    ap_prc->first_buf_in_frame = true;
