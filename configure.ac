@@ -1215,9 +1215,9 @@ AC_ARG_ENABLE([vdpau],
          [enable vdpau library @<:@default=auto@:>@])],
    [enable_vdpau="$enableval"],
    [enable_vdpau=auto])
-AC_ARG_ENABLE([omx],
-   [AS_HELP_STRING([--enable-omx],
-         [enable OpenMAX library @<:@default=disabled@:>@])],
+AC_ARG_ENABLE([omx-bellagio],
+   [AS_HELP_STRING([--enable-omx-bellagio],
+         [enable OpenMAX Bellagio library @<:@default=disabled@:>@])],
    [enable_omx="$enableval"],
    [enable_omx=no])
 AC_ARG_ENABLE([omx-tizonia],
