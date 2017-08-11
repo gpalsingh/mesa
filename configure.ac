@@ -2179,6 +2179,9 @@ fi
 AM_CONDITIONAL(HAVE_ST_OMX, test "x$enable_omx" = xyes)
 
 if test "x$enable_omx_tizonia" = xyes; then
+    if test "x$have_omx_platform" != xyes; then
+        AC_MSG_ERROR([OMX requires at least one of the x11 or drm platforms])
+    fi
     PKG_CHECK_MODULES([OMX_TIZONIA], [libtizonia >= $LIBOMXIL_TIZONIA_REQUIRED])
     PKG_CHECK_MODULES([OMX_TIZILHEADERS], [tizilheaders >= $LIBOMXIL_TIZONIA_REQUIRED])
     PKG_CHECK_MODULES([OMX_TIZPLATFORM], [libtizplatform >= $LIBOMXIL_TIZONIA_REQUIRED])
