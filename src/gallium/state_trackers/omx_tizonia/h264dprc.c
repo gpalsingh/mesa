@@ -594,7 +594,7 @@ static OMX_ERRORTYPE update_port_parameters(h264d_prc_t * p_prc) {
 
    /* Make changes only if there is a resolution change */
    if ((p_prc->in_port_def_.format.video.nFrameWidth == i_def->width) &&
-       (p_prc->in_port_def_.format.video.nFrameHeight == i_def->height))
+       (align(p_prc->in_port_def_.format.video.nFrameHeight, 0x10) == i_def->height))
       return err;
 
    unsigned framesize = i_def->width * i_def->height;
