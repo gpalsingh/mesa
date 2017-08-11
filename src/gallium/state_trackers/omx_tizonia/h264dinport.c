@@ -57,50 +57,37 @@ static void * h264d_inport_dtor(void * ap_obj)
 static OMX_ERRORTYPE h264d_inport_SetParameter(const void * ap_obj, OMX_HANDLETYPE ap_hdl,
                                                OMX_INDEXTYPE a_index, OMX_PTR ap_struct)
 {
-   h264d_inport_t * p_obj = (h264d_inport_t *) ap_obj;
-   h264d_prc_t * p_prc = tiz_get_prc(ap_hdl);
-   OMX_VIDEO_PORTDEFINITIONTYPE * p_def = NULL;   /* Output port info */
-   OMX_PARAM_PORTDEFINITIONTYPE * i_def = NULL; /* Info read from stream */
    OMX_ERRORTYPE err = OMX_ErrorNone;
 
-   err = super_SetParameter (typeOf (ap_obj, "h264dinport"), ap_obj,
-                             ap_hdl, a_index, ap_struct);
-   if (err)
-      return err;
-
    if (a_index == OMX_IndexParamPortDefinition) {
-      p_def = &(p_prc->out_port_def_.format.video);
-      i_def = (OMX_PARAM_PORTDEFINITIONTYPE *) ap_struct;
+      h264d_prc_t * p_prc = tiz_get_prc(ap_hdl);
+      OMX_VIDEO_PORTDEFINITIONTYPE * p_def = &(p_prc->out_port_def_.format.video);
+      OMX_PARAM_PORTDEFINITIONTYPE * i_def = (OMX_PARAM_PORTDEFINITIONTYPE *) ap_struct;
 
       /* Make changes only if there is a resolution change */
       if ((p_prc->in_port_def_.format.video.nFrameWidth == i_def->format.video.nFrameWidth) &&
-          (p_prc->in_port_def_.format.video.nFrameHeight == i_def->format.video.nFrameHeight))
+          (p_prc->in_port_def_.format.video.nFrameHeight == i_def->format.video.nFrameHeight) &&
+          (p_prc->in_port_def_.format.video.eCompressionFormat == i_def->format.video.eCompressionFormat))
          return err;
 
-      unsigned framesize = i_def->format.video.nFrameWidth * i_def->format.video.nFrameHeight;
+      /* Set some default values if not set */
+      if (i_def->format.video.nStride == 0)
+         i_def->format.video.nStride = i_def->format.video.nFrameWidth;
+      if (i_def->format.video.nSliceHeight == 0)
+         i_def->format.video.nSliceHeight = i_def->format.video.nFrameHeight;
 
-      p_prc->in_port_def_.format.video.nFrameWidth = i_def->format.video.nFrameWidth;
-      p_prc->in_port_def_.format.video.nFrameHeight = i_def->format.video.nFrameHeight;
-      p_prc->in_port_def_.nBufferSize = framesize * 512 / (16*16);
+      err = super_SetParameter(typeOf (ap_obj, "h264dinport"), ap_obj,
+                               ap_hdl, a_index, ap_struct);
+      if (err == OMX_ErrorNone) {
+         tiz_port_t * p_obj = (tiz_port_t *) ap_obj;
 
-      tiz_check_omx(tiz_krn_SetParameter_internal(
-         tiz_get_krn(ap_hdl), ap_hdl,
-         OMX_IndexParamPortDefinition, &(p_prc->in_port_def_)));
+         /* Set desired buffer size that will be used when allocating input buffers */
+         p_obj->portdef_.nBufferSize = i_def->format.video.nFrameWidth * i_def->format.video.nFrameHeight * 512 / (16*16);
 
-      p_def->nFrameWidth = i_def->format.video.nFrameWidth;
-      p_def->nFrameHeight = i_def->format.video.nFrameHeight;
-      p_def->nStride = i_def->format.video.nFrameWidth;
-      p_def->nSliceHeight = i_def->format.video.nFrameHeight;
-      p_prc->out_port_def_.nBufferSize = framesize*3/2;
-
-      tiz_check_omx(tiz_krn_SetParameter_internal(
-         tiz_get_krn(ap_hdl), ap_hdl,
-         OMX_IndexParamPortDefinition, &(p_prc->out_port_def_)));
-
-      tiz_srv_issue_event((OMX_PTR) p_prc, OMX_EventPortSettingsChanged,
-                           OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX,
-                              OMX_IndexParamPortDefinition,
-                              NULL);
+         /* Get a locally copy of port def. Useful for the early return above */
+         tiz_check_omx(tiz_api_GetParameter(tiz_get_krn(handleOf(p_prc)), handleOf(p_prc),
+                       OMX_IndexParamPortDefinition, &(p_prc->in_port_def_)));
+      }
    }
 
    return err;
