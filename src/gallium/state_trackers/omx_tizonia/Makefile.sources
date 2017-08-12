@@ -21,6 +21,6 @@ C_SOURCES := \
 	h264eoutport.c \
 	h264eoutport_decls.h \
 	h264eoutport.h \
-	names.h \
 	h264e_common.h \
-	h264e_common.c
+	h264e_common.c \
+	names.h
