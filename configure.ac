@@ -1215,11 +1215,6 @@ AC_ARG_ENABLE([vdpau],
          [enable vdpau library @<:@default=auto@:>@])],
    [enable_vdpau="$enableval"],
    [enable_vdpau=auto])
-AC_ARG_ENABLE([omx],
-    [AS_HELP_STRING([--enable-omx],
-        [DEPRECATED: use --enable-omx-bellagio or --enable-omx-tizonia instead @<:@default=disabled@:>@])],
-    [enable_omx_generic="$enableval" enable_omx_bellagio="$enableval"],
-    [enable_omx_generic=no])
 AC_ARG_ENABLE([omx-bellagio],
    [AS_HELP_STRING([--enable-omx-bellagio],
          [enable OpenMAX Bellagio library @<:@default=disabled@:>@])],
@@ -2124,13 +2119,8 @@ if test -n "$with_gallium_drivers" -a "x$with_gallium_drivers" != xswrast; then
         PKG_CHECK_EXISTS([vdpau >= $VDPAU_REQUIRED], [enable_vdpau=yes], [enable_vdpau=no])
     fi
 
-    if test "x$enable_omx" = xauto -a "x$have_omx_platform" = xyes; then
-        PKG_CHECK_EXISTS([libomxil-bellagio >= $LIBOMXIL_BELLAGIO_REQUIRED], [enable_omx_bellagio=yes], [
-            enable_omx_bellagio=no
-            if test "x$enable_omx_generic" = xyes; then
-                enable_omx_tizonia=yes # Try Tizonia OMX IL
-            fi
-        ])
+    if test "x$enable_omx_bellagio" = xauto -a "x$have_omx_platform" = xyes; then
+        PKG_CHECK_EXISTS([libomxil-bellagio >= $LIBOMXIL_BELLAGIO_REQUIRED], [enable_omx_bellagio=yes], [enable_omx_bellagio=no])
     fi
 
     if test "x$enable_omx_tizonia" = xauto -a "x$have_omx_platform" = xyes; then
