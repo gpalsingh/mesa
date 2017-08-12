@@ -41,12 +41,12 @@
 #include "entrypoint.h"
 #include "h264d.h"
 #include "h264dprc.h"
+#include "h264dinport.h"
 #include "h264e.h"
 #include "h264eprc.h"
-#include "names.h"
 #include "h264einport.h"
 #include "h264eoutport.h"
-#include "h264dinport.h"
+#include "names.h"
 
 #if defined(HAVE_X11_PLATFORM)
 #include <X11/Xlib.h>
