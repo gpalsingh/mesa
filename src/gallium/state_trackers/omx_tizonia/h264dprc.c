@@ -40,6 +40,9 @@
 #include "util/u_surface.h"
 #include "vl/vl_screen.h"
 
+#include "dri_screen.h"
+#include "egl_dri2.h"
+
 #define DPB_MAX_SIZE 5
 
 unsigned dec_frame_delta;
@@ -82,6 +85,25 @@ static const uint8_t Default_8x8_Inter[64] = {
    22, 24, 25, 27, 28, 30, 32, 33,
    24, 25, 27, 28, 30, 32, 33, 35
 };
+
+#define PTR_TO_UINT(x) ((unsigned)((intptr_t)(x)))
+
+static unsigned handle_hash(void *key)
+{
+   return PTR_TO_UINT(key);
+}
+
+static int handle_compare(void *key1, void *key2)
+{
+   return PTR_TO_UINT(key1) != PTR_TO_UINT(key2);
+}
+
+static enum pipe_error hash_table_clear_item_callback(void *key, void *value, void *data)
+{
+   struct pipe_video_buffer *video_buffer = (struct pipe_video_buffer *)value;
+   video_buffer->destroy(video_buffer);
+   return PIPE_OK;
+}
 
 static void h264d_free_input_port_private(OMX_BUFFERHEADERTYPE *buf)
 {
@@ -208,6 +230,66 @@ static OMX_BUFFERHEADERTYPE * get_input_buffer(h264d_prc_t * p_prc) {
    return p_prc->p_inhdr_;
 }
 
+static struct pipe_resource * st_omx_pipe_texture_from_eglimage(EGLDisplay egldisplay,
+                                                                EGLImage eglimage)
+{
+   _EGLDisplay *disp = egldisplay;
+   struct dri2_egl_display *dri2_egl_dpy = disp->DriverData;
+   __DRIscreen *_dri_screen = dri2_egl_dpy->dri_screen;
+   struct dri_screen *st_dri_screen = dri_screen(_dri_screen);
+   __DRIimage *_dri_image = st_dri_screen->lookup_egl_image(st_dri_screen, eglimage);
+
+   return _dri_image->texture;
+}
+
+static void get_eglimage(h264d_prc_t * p_prc) {
+   OMX_PTR p_eglimage = NULL;
+   OMX_NATIVE_WINDOWTYPE * p_egldisplay = NULL;
+   const tiz_port_t * p_port = NULL;
+   struct pipe_video_buffer templat = {};
+   struct pipe_video_buffer *video_buffer = NULL;
+   struct pipe_resource * p_res = NULL;
+   struct pipe_resource *resources[VL_NUM_COMPONENTS];
+
+   if (OMX_ErrorNone ==
+      tiz_krn_claim_eglimage(tiz_get_krn (handleOf (p_prc)),
+                             OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX,
+                             p_prc->p_outhdr_, &p_eglimage)) {
+      p_prc->use_eglimage = true;
+      p_port = tiz_krn_get_port(tiz_get_krn (handleOf (p_prc)),
+                                OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX);
+      p_egldisplay = p_port->portdef_.format.video.pNativeWindow;
+
+      if (!util_hash_table_get(p_prc->video_buffer_map, p_prc->p_outhdr_)) {
+        p_res = st_omx_pipe_texture_from_eglimage(p_egldisplay, p_eglimage);
+
+        assert(p_res);
+
+        memset(&templat, 0, sizeof(templat));
+        templat.buffer_format = p_res->format;
+        templat.chroma_format = PIPE_VIDEO_CHROMA_FORMAT_NONE;
+        templat.width = p_res->width0;
+        templat.height = p_res->height0;
+        templat.interlaced = 0;
+
+        memset(resources, 0, sizeof(resources));
+        pipe_resource_reference(&resources[0], p_res);
+
+        video_buffer = vl_video_buffer_create_ex2(p_prc->pipe, &templat, resources);
+
+        assert(video_buffer);
+        assert(video_buffer->buffer_format == p_res->format);
+
+        util_hash_table_set(p_prc->video_buffer_map, p_prc->p_outhdr_, video_buffer);
+      }
+   } else {
+      (void) tiz_krn_release_buffer(tiz_get_krn (handleOf (p_prc)),
+                                    OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX,
+                                    p_prc->p_outhdr_);
+      p_prc->p_outhdr_ = NULL;
+   }
+}
+
 static OMX_BUFFERHEADERTYPE * get_output_buffer(h264d_prc_t * p_prc) {
    assert (p_prc);
 
@@ -216,11 +298,19 @@ static OMX_BUFFERHEADERTYPE * get_output_buffer(h264d_prc_t * p_prc) {
    }
 
    if (!p_prc->p_outhdr_) {
-       tiz_krn_claim_buffer(tiz_get_krn (handleOf (p_prc)),
-                              OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX, 0,
-                              &p_prc->p_outhdr_);
-    }
-    return p_prc->p_outhdr_;
+      if (OMX_ErrorNone
+          == tiz_krn_claim_buffer(tiz_get_krn (handleOf (p_prc)),
+                                  OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX, 0,
+                                  &p_prc->p_outhdr_)) {
+         if (p_prc->p_outhdr_) {
+            /* Check pBuffer nullity to know if an eglimage has been registered. */
+            if (!p_prc->p_outhdr_->pBuffer) {
+               get_eglimage(p_prc);
+            }
+         }
+      }
+   }
+   return p_prc->p_outhdr_;
 }
 
 static struct pipe_video_buffer *h264d_flush(h264d_prc_t *p_prc, OMX_TICKS *timestamp)
@@ -1299,6 +1389,42 @@ static void h264d_fill_output(h264d_prc_t *p_prc, struct pipe_video_buffer *buf,
 
    views = buf->get_sampler_view_planes(buf);
 
+   if (!output->pBuffer) {
+      struct pipe_video_buffer *dst_buf = NULL;
+      struct pipe_surface **dst_surface = NULL;
+      struct u_rect src_rect;
+      struct u_rect dst_rect;
+      struct vl_compositor *compositor = &p_prc->compositor;
+      struct vl_compositor_state *s = &p_prc->cstate;
+      enum vl_compositor_deinterlace deinterlace = VL_COMPOSITOR_WEAVE;
+
+      dst_buf = util_hash_table_get(p_prc->video_buffer_map, output);
+      assert(dst_buf);
+
+      dst_surface = dst_buf->get_surfaces(dst_buf);
+      assert(views);
+
+      src_rect.x0 = 0;
+      src_rect.y0 = 0;
+      src_rect.x1 = def->nFrameWidth;
+      src_rect.y1 = def->nFrameHeight;
+
+      dst_rect.x0 = 0;
+      dst_rect.y0 = 0;
+      dst_rect.x1 = def->nFrameWidth;
+      dst_rect.y1 = def->nFrameHeight;
+
+      vl_compositor_clear_layers(s);
+      vl_compositor_set_buffer_layer(s, compositor, 0, buf,
+              &src_rect, NULL, deinterlace);
+      vl_compositor_set_layer_dst_area(s, 0, &dst_rect);
+      vl_compositor_render(s, compositor, dst_surface[0], NULL, false);
+
+      p_prc->pipe->flush(p_prc->pipe, NULL, 0);
+
+      return;
+   }
+
    for (i = 0; i < 2 /* NV12 */; i++) {
       if (!views[i]) continue;
       width = def->nFrameWidth;
@@ -1388,7 +1514,7 @@ static void h264d_manage_buffers(h264d_prc_t* p_prc) {
 
    /* Realase output buffer if filled or eos
       Keep if two input buffers are being decoded */
-   if ((!next_is_eos) && ((p_prc->p_outhdr_->nFilledLen > 0) || p_prc->eos_)) {
+   if ((!next_is_eos) && ((p_prc->p_outhdr_->nFilledLen > 0) || p_prc->use_eglimage  || p_prc->eos_)) {
       h264d_buffer_filled(p_prc, p_prc->p_outhdr_);
    }
 
@@ -1496,6 +1622,7 @@ static OMX_ERRORTYPE h264d_prc_allocate_resources(void *ap_obj, OMX_U32 a_pid)
 {
    h264d_prc_t *p_prc = ap_obj;
    struct pipe_screen *screen;
+   vl_csc_matrix csc;
 
    assert (p_prc);
 
@@ -1521,7 +1648,17 @@ static OMX_ERRORTYPE h264d_prc_allocate_resources(void *ap_obj, OMX_U32 a_pid)
       return OMX_ErrorInsufficientResources;
    }
 
+   vl_csc_get_matrix(VL_CSC_COLOR_STANDARD_BT_601, NULL, true, &csc);
+   if (!vl_compositor_set_csc_matrix(&p_prc->cstate, (const vl_csc_matrix *)&csc, 1.0f, 0.0f)) {
+      vl_compositor_cleanup(&p_prc->compositor);
+      p_prc->pipe->destroy(p_prc->pipe);
+      p_prc->pipe = NULL;
+      return OMX_ErrorInsufficientResources;
+   }
+
    LIST_INITHEAD(&p_prc->codec_data.dpb_list);
+
+   p_prc->video_buffer_map = util_hash_table_create(handle_hash, handle_compare);
 
    return OMX_ErrorNone;
 }
@@ -1531,6 +1668,11 @@ static OMX_ERRORTYPE h264d_prc_deallocate_resources(void *ap_obj)
    h264d_prc_t *p_prc = ap_obj;
    assert(p_prc);
 
+   /* Clear hash table */
+   util_hash_table_foreach(p_prc->video_buffer_map,
+                            &hash_table_clear_item_callback,
+                            NULL);
+   util_hash_table_destroy(p_prc->video_buffer_map);
 
    if (p_prc->pipe) {
       vl_compositor_cleanup_state(&p_prc->cstate);
