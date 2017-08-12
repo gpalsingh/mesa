@@ -1357,7 +1357,7 @@ if test "x$enable_opengl" = xno -a \
         "x$enable_xa" = xno -a \
         "x$enable_xvmc" = xno -a \
         "x$enable_vdpau" = xno -a \
-        "x$enable_omx" = xno -a \
+        "x$enable_omx_bellagio" = xno -a \
         "x$enable_omx_tizonia" = xno -a \
         "x$enable_va" = xno -a \
         "x$enable_opencl" = xno; then
@@ -2989,7 +2989,7 @@ AC_CONFIG_FILES([Makefile
                  src/gallium/targets/d3dadapter9/d3d.pc
                  src/gallium/targets/dri/Makefile
                  src/gallium/targets/libgl-xlib/Makefile
-                 src/gallium/targets/omx/Makefile
+                 src/gallium/targets/omx-bellagio/Makefile
                  src/gallium/targets/omx-tizonia/Makefile
                  src/gallium/targets/opencl/Makefile
                  src/gallium/targets/opencl/mesa.icd
