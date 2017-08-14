@@ -1344,6 +1344,7 @@ static void reset_stream_parameters(h264d_prc_t * ap_prc)
    ap_prc->frame_finished = false;
    ap_prc->frame_started = false;
    ap_prc->picture.h264.field_order_cnt[0] = ap_prc->picture.h264.field_order_cnt[1] = INT_MAX;
+   ap_prc->slice = NULL;
 }
 
 static void h264d_deint(h264d_prc_t *p_prc, struct pipe_video_buffer *src_buf,
