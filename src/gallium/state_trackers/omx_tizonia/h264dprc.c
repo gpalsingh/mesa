@@ -566,17 +566,13 @@ static void seq_parameter_set(h264d_prc_t *p_prc, struct vl_rbsp *rbsp)
 
    /* frame_cropping_flag */
    if (vl_rbsp_u(rbsp, 1)) {
-      /* frame_crop_left_offset */
-      vl_rbsp_ue(rbsp);
+      unsigned frame_crop_left_offset = vl_rbsp_ue(rbsp);
+      unsigned frame_crop_right_offset = vl_rbsp_ue(rbsp);
+      unsigned frame_crop_top_offset = vl_rbsp_ue(rbsp);
+      unsigned frame_crop_bottom_offset = vl_rbsp_ue(rbsp);
 
-      /* frame_crop_right_offset */
-      vl_rbsp_ue(rbsp);
-
-      /* frame_crop_top_offset */
-      vl_rbsp_ue(rbsp);
-
-      /* frame_crop_bottom_offset */
-      vl_rbsp_ue(rbsp);
+      p_prc->stream_info.width -= (frame_crop_left_offset + frame_crop_right_offset) * 2;
+      p_prc->stream_info.height -= (frame_crop_top_offset + frame_crop_bottom_offset) * 2;
    }
 
    /* vui_parameters_present_flag */
@@ -595,7 +591,7 @@ static OMX_ERRORTYPE update_port_parameters(h264d_prc_t * p_prc) {
    i_def = &(p_prc->stream_info);
 
    /* Handle dynamic resolution change */
-   if ((p_def->nFrameWidth == i_def->width) && (align(p_def->nFrameHeight, 0x10) == i_def->height))
+   if ((p_def->nFrameWidth == i_def->width) && p_def->nFrameHeight == i_def->height)
       return err;
 
    p_def->nFrameWidth = i_def->width;
