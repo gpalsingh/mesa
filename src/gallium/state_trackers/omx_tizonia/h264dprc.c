@@ -1618,6 +1618,7 @@ static OMX_ERRORTYPE h264d_prc_allocate_resources(void *ap_obj, OMX_U32 a_pid)
 {
    h264d_prc_t *p_prc = ap_obj;
    struct pipe_screen *screen;
+   vl_csc_matrix csc;
 
    assert (p_prc);
 
@@ -1637,6 +1638,14 @@ static OMX_ERRORTYPE h264d_prc_allocate_resources(void *ap_obj, OMX_U32 a_pid)
    }
 
    if (!vl_compositor_init_state(&p_prc->cstate, p_prc->pipe)) {
+      vl_compositor_cleanup(&p_prc->compositor);
+      p_prc->pipe->destroy(p_prc->pipe);
+      p_prc->pipe = NULL;
+      return OMX_ErrorInsufficientResources;
+   }
+
+   vl_csc_get_matrix(VL_CSC_COLOR_STANDARD_BT_601, NULL, true, &csc);
+   if (!vl_compositor_set_csc_matrix(&p_prc->cstate, (const vl_csc_matrix *)&csc, 1.0f, 0.0f)) {
       vl_compositor_cleanup(&p_prc->compositor);
       p_prc->pipe->destroy(p_prc->pipe);
       p_prc->pipe = NULL;
