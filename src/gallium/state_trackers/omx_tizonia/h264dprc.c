@@ -262,21 +262,19 @@ static void get_eglimage(h264d_prc_t * p_prc) {
         assert(p_res);
 
         memset(&templat, 0, sizeof(templat));
-
-        assert(p_res->format == PIPE_FORMAT_R8G8B8A8_UNORM);
-
-        templat.buffer_format = PIPE_FORMAT_R8G8B8A8_UNORM; // RGBA
+        templat.buffer_format = p_res->format;
         templat.chroma_format = PIPE_VIDEO_CHROMA_FORMAT_NONE;
         templat.width = p_res->width0;
         templat.height = p_res->height0;
         templat.interlaced = 0;
 
-        memset(resources, 0, sizeof resources);
-        resources[0] = p_res;
+        memset(resources, 0, sizeof(resources));
+        pipe_resource_reference(&resources[0], p_res);
 
         video_buffer = vl_video_buffer_create_ex2(p_prc->pipe, &templat, resources);
 
         assert(video_buffer);
+        assert(video_buffer->buffer_format == p_res->format);
 
         util_hash_table_set(p_prc->video_buffer_map, p_prc->p_outhdr_, video_buffer);
       }
@@ -1396,15 +1394,10 @@ static void h264d_fill_output(h264d_prc_t *p_prc, struct pipe_video_buffer *buf,
       struct vl_compositor_state *s = &p_prc->cstate;
       enum vl_compositor_deinterlace deinterlace = VL_COMPOSITOR_WEAVE;
 
-      /* Write into the current eglimage using
-      * the unique decoder target NV12 */
-
       dst_buf = util_hash_table_get(p_prc->video_buffer_map, output);
       assert(dst_buf);
 
       dst_surface = dst_buf->get_surfaces(dst_buf);
-
-      views = buf->get_sampler_view_planes(buf);
       assert(views);
 
       src_rect.x0 = 0;
