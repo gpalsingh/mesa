@@ -27,18 +27,7 @@
 
 #include "vl_winsys.h"
 
-typedef vid_dec_PrivateType vid_dec_PrivateType_;
-typedef struct h264d_prc_t h264d_prc_t_;
-
-enum lib_type {
-   OMX_MESA_USE_BELLAGIO = 0,
-   OMX_MESA_USE_TIZONIA
-};
-
 struct vl_screen *get_screen(void);
 void put_screen(void);
-void slice_header_h264(void *prc, struct vl_rbsp *rbsp,
-                       unsigned nal_ref_idc, unsigned nal_unit_type,
-                       enum lib_type prc_type);
 
 #endif
