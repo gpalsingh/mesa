@@ -50,6 +50,7 @@
 #include "util/u_surface.h"
 #include "vl/vl_video_buffer.h"
 #include "vl/vl_vlc.h"
+#include "vl/vl_st_common.h"
 
 #include "entrypoint.h"
 #include "vid_dec.h"
@@ -173,7 +174,7 @@ static OMX_ERRORTYPE vid_dec_Constructor(OMX_COMPONENTTYPE *comp, OMX_STRING nam
    comp->SetParameter = vid_dec_SetParameter;
    comp->GetParameter = vid_dec_GetParameter;
 
-   priv->screen = omx_get_screen();
+   priv->screen = get_screen();
    if (!priv->screen)
       return OMX_ErrorInsufficientResources;
 
@@ -253,7 +254,7 @@ static OMX_ERRORTYPE vid_dec_Destructor(OMX_COMPONENTTYPE *comp)
    }
 
    if (priv->screen)
-      omx_put_screen();
+      put_screen();
 
    return omx_workaround_Destructor(comp);
 }
