@@ -25,10 +25,6 @@
  *
  **************************************************************************/
 
-#include <assert.h>
-#include <string.h>
-#include <stdbool.h>
-
 #include <tizplatform.h>
 #include <tizkernel.h>
 #include <tizscheduler.h>
@@ -36,10 +32,6 @@
 #include <tizport_decls.h>
 #include <tizvideoport.h>
 #include <tizvideoport_decls.h>
-
-#include "os/os_thread.h"
-#include "util/u_memory.h"
-#include "loader/loader.h"
 
 #include "entrypoint.h"
 #include "h264d.h"
@@ -51,20 +43,7 @@
 #include "h264eoutport.h"
 #include "names.h"
 
-#if defined(HAVE_X11_PLATFORM)
-#include <X11/Xlib.h>
-#else
-#define XOpenDisplay(x) NULL
-#define XCloseDisplay(x)
-#define Display void
-#endif
-
-static mtx_t omx_lock = _MTX_INITIALIZER_NP;
-static Display *omx_display = NULL;
-static struct vl_screen *omx_screen = NULL;
-static unsigned omx_usecount = 0;
-static const char *omx_render_node = NULL;
-static int drm_fd;
+#include "util/u_debug.h"
 
 DEBUG_GET_ONCE_BOOL_OPTION(mesa_enable_omx_eglimage,
                            "MESA_ENABLE_OMX_EGLIMAGE",
@@ -173,64 +152,4 @@ OMX_ERRORTYPE OMX_ComponentInit (OMX_HANDLETYPE ap_hdl)
                       &egl_validation_hook));
 
    return OMX_ErrorNone;
-}
-
-struct vl_screen *omx_get_screen(void)
-{
-   static bool first_time = true;
-   mtx_lock(&omx_lock);
-
-   if (!omx_screen) {
-      if (first_time) {
-         omx_render_node = debug_get_option("OMX_RENDER_NODE", NULL);
-         first_time = false;
-      }
-      if (omx_render_node) {
-         drm_fd = loader_open_device(omx_render_node);
-         if (drm_fd < 0)
-            goto error;
-
-         omx_screen = vl_drm_screen_create(drm_fd);
-         if (!omx_screen) {
-            close(drm_fd);
-            goto error;
-         }
-      } else {
-         omx_display = XOpenDisplay(NULL);
-         if (!omx_display)
-            goto error;
-
-         omx_screen = vl_dri3_screen_create(omx_display, 0);
-         if (!omx_screen)
-            omx_screen = vl_dri2_screen_create(omx_display, 0);
-         if (!omx_screen) {
-            XCloseDisplay(omx_display);
-            goto error;
-         }
-      }
-   }
-
-   ++omx_usecount;
-
-   mtx_unlock(&omx_lock);
-   return omx_screen;
-
-error:
-   mtx_unlock(&omx_lock);
-   return NULL;
-}
-
-void omx_put_screen(void)
-{
-   mtx_lock(&omx_lock);
-   if ((--omx_usecount) == 0) {
-      omx_screen->destroy(omx_screen);
-      omx_screen = NULL;
-
-      if (omx_render_node)
-         close(drm_fd);
-      else
-         XCloseDisplay(omx_display);
-   }
-   mtx_unlock(&omx_lock);
 }
