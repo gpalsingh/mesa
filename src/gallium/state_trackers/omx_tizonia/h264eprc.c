@@ -33,6 +33,7 @@
 #include "pipe/p_video_codec.h"
 #include "util/u_memory.h"
 #include "vl/vl_video_buffer.h"
+#include "vl/vl_st_common.h"
 
 #include "entrypoint.h"
 #include "h264e.h"
@@ -739,7 +740,7 @@ static OMX_ERRORTYPE h264e_prc_allocate_resources(void *ap_obj, OMX_U32 a_pid)
    h264e_prc_t *p_prc = ap_obj;
    struct pipe_screen *screen;
 
-   p_prc->screen = omx_get_screen();
+   p_prc->screen = get_screen();
    if (!p_prc->screen)
       return OMX_ErrorInsufficientResources;
 
@@ -803,7 +804,7 @@ static OMX_ERRORTYPE h264e_prc_deallocate_resources(void *ap_obj)
       p_prc->t_pipe->destroy(p_prc->t_pipe);
 
    if (p_prc->screen)
-      omx_put_screen();
+      put_screen();
 
    return OMX_ErrorNone;
 }
