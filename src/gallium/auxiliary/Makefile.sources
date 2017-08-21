@@ -341,8 +341,8 @@ VL_SOURCES := \
 	vl/vl_mpeg12_decoder.c \
 	vl/vl_mpeg12_decoder.h \
 	vl/vl_rbsp.h \
-	vl/vl_st_common.c \
-	vl/vl_st_common.h \
+	vl/vl_screen.c \
+	vl/vl_screen.h \
 	vl/vl_types.h \
 	vl/vl_vertex_buffers.c \
 	vl/vl_vertex_buffers.h \

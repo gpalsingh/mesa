@@ -38,7 +38,7 @@
 #include "vl/vl_compositor.h"
 #include "util/u_memory.h"
 #include "util/u_surface.h"
-#include "vl/vl_st_common.h"
+#include "vl/vl_screen.h"
 
 #include "dri_screen.h"
 #include "egl_dri2.h"
@@ -1626,7 +1626,7 @@ static OMX_ERRORTYPE h264d_prc_allocate_resources(void *ap_obj, OMX_U32 a_pid)
 
    assert (p_prc);
 
-   p_prc->screen = get_screen();
+   p_prc->screen = vl_get_screen("OMX_RENDER_NODE");
    if (!p_prc->screen)
       return OMX_ErrorInsufficientResources;
 
@@ -1681,7 +1681,7 @@ static OMX_ERRORTYPE h264d_prc_deallocate_resources(void *ap_obj)
    }
 
    if (p_prc->screen)
-      put_screen();
+      vl_put_screen();
 
    return OMX_ErrorNone;
 }
