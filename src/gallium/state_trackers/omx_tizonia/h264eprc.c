@@ -705,37 +705,7 @@ static OMX_ERRORTYPE encode_frame(h264e_prc_t * p_prc, OMX_BUFFERHEADERTYPE * in
    }
 }
 
-/*
- * h264eprc
- */
-
-static void * h264e_prc_ctor(void *ap_obj, va_list * app)
-{
-   h264e_prc_t *p_prc = super_ctor(typeOf(ap_obj, "h264eprc"), ap_obj, app);
-   assert (p_prc);
-   p_prc->p_inhdr_ = 0;
-   p_prc->p_outhdr_ = 0;
-   p_prc->profile_level.eProfile = OMX_VIDEO_AVCProfileBaseline;
-   p_prc->profile_level.eLevel = OMX_VIDEO_AVCLevel51;
-   p_prc->force_pic_type.IntraRefreshVOP = OMX_FALSE;
-   p_prc->frame_num = 0;
-   p_prc->pic_order_cnt = 0;
-   p_prc->restricted_b_frames = debug_get_bool_option("OMX_USE_RESTRICTED_B_FRAMES", FALSE);
-   p_prc->scale.xWidth = OMX_VID_ENC_SCALING_WIDTH_DEFAULT;
-   p_prc->scale.xHeight = OMX_VID_ENC_SCALING_WIDTH_DEFAULT;
-   p_prc->in_port_disabled_   = false;
-   p_prc->out_port_disabled_   = false;
-   reset_stream_parameters(p_prc);
-
-   return p_prc;
-}
-
-static void * h264e_prc_dtor(void *ap_obj)
-{
-   return super_dtor(typeOf(ap_obj, "h264eprc"), ap_obj);
-}
-
-static OMX_ERRORTYPE h264e_prc_allocate_resources(void *ap_obj, OMX_U32 a_pid)
+static OMX_ERRORTYPE h264e_prc_create_encoder(void *ap_obj)
 {
    h264e_prc_t *p_prc = ap_obj;
    struct pipe_screen *screen;
@@ -778,7 +748,7 @@ static OMX_ERRORTYPE h264e_prc_allocate_resources(void *ap_obj, OMX_U32 a_pid)
    return OMX_ErrorNone;
 }
 
-static OMX_ERRORTYPE h264e_prc_deallocate_resources(void *ap_obj)
+static void h264e_prc_destroy_encoder(void *ap_obj)
 {
    h264e_prc_t *p_prc = ap_obj;
    int i;
@@ -805,7 +775,50 @@ static OMX_ERRORTYPE h264e_prc_deallocate_resources(void *ap_obj)
 
    if (p_prc->screen)
       vl_put_screen();
+}
 
+/*
+ * h264eprc
+ */
+
+static void * h264e_prc_ctor(void *ap_obj, va_list * app)
+{
+   h264e_prc_t *p_prc = super_ctor(typeOf(ap_obj, "h264eprc"), ap_obj, app);
+   assert (p_prc);
+
+   if (h264e_prc_create_encoder(ap_obj) != OMX_ErrorNone)
+     return NULL;
+
+   p_prc->p_inhdr_ = 0;
+   p_prc->p_outhdr_ = 0;
+   p_prc->profile_level.eProfile = OMX_VIDEO_AVCProfileBaseline;
+   p_prc->profile_level.eLevel = OMX_VIDEO_AVCLevel51;
+   p_prc->force_pic_type.IntraRefreshVOP = OMX_FALSE;
+   p_prc->frame_num = 0;
+   p_prc->pic_order_cnt = 0;
+   p_prc->restricted_b_frames = debug_get_bool_option("OMX_USE_RESTRICTED_B_FRAMES", FALSE);
+   p_prc->scale.xWidth = OMX_VID_ENC_SCALING_WIDTH_DEFAULT;
+   p_prc->scale.xHeight = OMX_VID_ENC_SCALING_WIDTH_DEFAULT;
+   p_prc->in_port_disabled_   = false;
+   p_prc->out_port_disabled_   = false;
+   reset_stream_parameters(p_prc);
+
+   return p_prc;
+}
+
+static void * h264e_prc_dtor(void *ap_obj)
+{
+   h264e_prc_destroy_encoder(ap_obj);
+   return super_dtor(typeOf(ap_obj, "h264eprc"), ap_obj);
+}
+
+static OMX_ERRORTYPE h264e_prc_allocate_resources(void *ap_obj, OMX_U32 a_pid)
+{
+   return OMX_ErrorNone;
+}
+
+static OMX_ERRORTYPE h264e_prc_deallocate_resources(void *ap_obj)
+{
    return OMX_ErrorNone;
 }
 
