@@ -29,7 +29,7 @@
 #include "os/os_thread.h"
 #include "util/u_memory.h"
 #include "loader/loader.h"
-#include "vl_st_common.h"
+#include "vl_screen.h"
 
 #if defined(HAVE_X11_PLATFORM)
 #include <X11/Xlib.h>
@@ -46,14 +46,14 @@ static unsigned st_usecount = 0;
 static const char *st_render_node = NULL;
 static int drm_fd;
 
-struct vl_screen *get_screen(void)
+struct vl_screen *vl_get_screen(const char* render_node)
 {
    static bool first_time = true;
    mtx_lock(&st_lock);
 
    if (!st_screen) {
       if (first_time) {
-         st_render_node = debug_get_option("OMX_RENDER_NODE", NULL);
+         st_render_node = debug_get_option(render_node, NULL);
          first_time = false;
       }
       if (st_render_node) {
@@ -91,7 +91,7 @@ error:
    return NULL;
 }
 
-void put_screen(void)
+void vl_put_screen(void)
 {
    mtx_lock(&st_lock);
    if ((--st_usecount) == 0) {

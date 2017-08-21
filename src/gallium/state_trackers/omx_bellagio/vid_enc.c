@@ -50,7 +50,7 @@
 #include "pipe/p_video_codec.h"
 #include "util/u_memory.h"
 #include "vl/vl_video_buffer.h"
-#include "vl/vl_st_common.h"
+#include "vl/vl_screen.h"
 
 #include "entrypoint.h"
 #include "vid_enc.h"
@@ -171,7 +171,7 @@ static OMX_ERRORTYPE vid_enc_Constructor(OMX_COMPONENTTYPE *comp, OMX_STRING nam
    comp->GetConfig = vid_enc_GetConfig;
    comp->SetConfig = vid_enc_SetConfig;
 
-   priv->screen = get_screen();
+   priv->screen = vl_get_screen("OMX_RENDER_NODE");
    if (!priv->screen)
       return OMX_ErrorInsufficientResources;
 
@@ -297,7 +297,7 @@ static OMX_ERRORTYPE vid_enc_Destructor(OMX_COMPONENTTYPE *comp)
       priv->t_pipe->destroy(priv->t_pipe);
 
    if (priv->screen)
-      put_screen();
+      vl_put_screen();
 
    return omx_workaround_Destructor(comp);
 }

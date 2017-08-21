@@ -22,12 +22,12 @@
  *
  **************************************************************************/
 
-#ifndef VL_ST_COMMON_H
-#define VL_ST_COMMON_H
+#ifndef VL_VL_SCREEN_H
+#define VL_VL_SCREEN_H
 
 #include "vl_winsys.h"
 
-struct vl_screen *get_screen(void);
-void put_screen(void);
+struct vl_screen *vl_get_screen(const char* render_node);
+void vl_put_screen(void);
 
 #endif
