@@ -117,7 +117,8 @@ OMX_PTR instantiate_h264d_input_port(OMX_HANDLETYPE ap_hdl)
    return factory_new (tiz_get_type(ap_hdl, "h264dinport"),
                        &avc_port_opts, &portdef,
                        &encodings, &formats, &avctype, &levels,
-                       NULL  /* OMX_VIDEO_PARAM_BITRATETYPE */);
+                       NULL  /* OMX_VIDEO_PARAM_BITRATETYPE */,
+                       NULL  /* OMX_VIDEO_PARAM_QUANTIZATIONTYPE */);
 }
 
 OMX_PTR instantiate_h264d_output_port(OMX_HANDLETYPE ap_hdl)
