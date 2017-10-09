@@ -33,6 +33,7 @@
 #include <tizvideoport.h>
 #include <tizvideoport_decls.h>
 
+#include "vid_dec_h264_common.h"
 #include "entrypoint.h"
 #include "h264d.h"
 #include "h264dprc.h"

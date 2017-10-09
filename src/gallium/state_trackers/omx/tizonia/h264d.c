@@ -24,6 +24,8 @@
 
 #include <tizport_decls.h>
 
+#include "vid_dec_h264_common.h"
+
 #include "h264dprc.h"
 #include "h264d.h"
 #include "names.h"

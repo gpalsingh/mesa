@@ -34,6 +34,7 @@ AM_CFLAGS = \
 	-I$(top_srcdir)/src/loader \
 	-I$(top_srcdir)/src/gbm/backends/dri \
 	-I$(top_srcdir)/src/gallium/state_trackers/dri \
+	-I$(top_srcdir)/src/gallium/state_trackers/omx \
 	$(GALLIUM_CFLAGS) \
 	$(LIBDRM_CFLAGS) \
 	$(VISIBILITY_CFLAGS) \

@@ -25,45 +25,23 @@
  *
  **************************************************************************/
 
-/*
- * Authors:
- *      Christian König <christian.koenig@amd.com>
- *
- */
+#ifndef VID_DEC_COMMON_H
+#define VID_DEC_COMMON_H
 
-#ifndef OMX_VID_DEC_H
-#define OMX_VID_DEC_H
+#include "util/list.h"
 
-#include <string.h>
+#include "vl/vl_compositor.h"
+#include "vl/vl_rbsp.h"
+#include "vl/vl_zscan.h"
 
-#include <OMX_Types.h>
-#include <OMX_Component.h>
+#if ENABLE_ST_OMX_BELLAGIO
+
 #include <OMX_Core.h>
+#include <OMX_Types.h>
 
 #include <bellagio/st_static_component_loader.h>
 #include <bellagio/omx_base_filter.h>
 #include <bellagio/omx_base_video_port.h>
-
-#include "pipe/p_video_state.h"
-#include "os/os_thread.h"
-#include "util/list.h"
-
-#include "vl/vl_compositor.h"
-
-#define OMX_VID_DEC_BASE_NAME "OMX.mesa.video_decoder"
-
-#define OMX_VID_DEC_MPEG2_NAME "OMX.mesa.video_decoder.mpeg2"
-#define OMX_VID_DEC_MPEG2_ROLE "video_decoder.mpeg2"
-
-#define OMX_VID_DEC_AVC_NAME "OMX.mesa.video_decoder.avc"
-#define OMX_VID_DEC_AVC_ROLE "video_decoder.avc"
-
-#define OMX_VID_DEC_HEVC_NAME "OMX.mesa.video_decoder.hevc"
-#define OMX_VID_DEC_HEVC_ROLE "video_decoder.hevc"
-
-#define OMX_VID_DEC_TIMESTAMP_INVALID ((OMX_TICKS) -1)
-
-struct vl_vlc;
 
 DERIVEDCLASS(vid_dec_PrivateType, omx_base_filter_PrivateType)
 #define vid_dec_PrivateType_FIELDS omx_base_filter_PrivateType_FIELDS \
@@ -131,18 +109,89 @@ DERIVEDCLASS(vid_dec_PrivateType, omx_base_filter_PrivateType)
    struct vl_compositor_state cstate;
 ENDCLASS(vid_dec_PrivateType)
 
-OMX_ERRORTYPE vid_dec_LoaderComponent(stLoaderComponentType *comp);
+#else
 
-/* used by MPEG12 and H264 implementation */
-void vid_dec_NeedTarget(vid_dec_PrivateType *priv);
+#include <tizonia/OMX_Core.h>
+#include <tizonia/OMX_Types.h>
 
-/* vid_dec_mpeg12.c */
-void vid_dec_mpeg12_Init(vid_dec_PrivateType *priv);
+#include <tizprc_decls.h>
+#include <tizport_decls.h>
 
-/* vid_dec_h264.c */
-void vid_dec_h264_Init(vid_dec_PrivateType *priv);
+#include "pipe/p_video_state.h"
 
-/* vid_dec_h265.c */
-void vid_dec_h265_Init(vid_dec_PrivateType *priv);
+typedef struct h264d_prc_class h264d_prc_class_t;
+struct h264d_prc_class
+{
+   /* Class */
+   const tiz_prc_class_t _;
+   /* NOTE: Class methods might be added in the future */
+};
 
+typedef struct h264d_stream_info h264d_stream_info_t;
+struct h264d_stream_info
+{
+   unsigned int width;
+   unsigned int height;
+};
+
+typedef struct h264d_prc vid_dec_PrivateType;
+struct h264d_prc
+{
+   /* Object */
+   const tiz_prc_t _;
+   OMX_BUFFERHEADERTYPE *in_buffers[2];
+   OMX_BUFFERHEADERTYPE *p_inhdr_;
+   OMX_BUFFERHEADERTYPE *p_outhdr_;
+   OMX_PARAM_PORTDEFINITIONTYPE out_port_def_;
+   const void *inputs[2];
+   unsigned sizes[2];
+   OMX_TICKS timestamps[2];
+   OMX_TICKS timestamp;
+   bool eos_;
+   bool in_port_disabled_;
+   bool out_port_disabled_;
+   struct vl_screen *screen;
+   struct pipe_context *pipe;
+   struct pipe_video_codec *codec;
+   struct pipe_video_buffer *target;
+   enum pipe_video_profile profile;
+   struct util_hash_table *video_buffer_map;
+   union {
+         struct {
+            unsigned nal_ref_idc;
+            bool IdrPicFlag;
+            unsigned idr_pic_id;
+            unsigned pic_order_cnt_lsb;
+            unsigned pic_order_cnt_msb;
+            unsigned delta_pic_order_cnt_bottom;
+            unsigned delta_pic_order_cnt[2];
+            unsigned prevFrameNumOffset;
+            struct pipe_h264_sps sps[32];
+            struct pipe_h264_pps pps[256];
+            struct list_head dpb_list;
+            unsigned dpb_num;
+         } h264;
+   } codec_data;
+   union {
+      struct pipe_picture_desc base;
+      struct pipe_h264_picture_desc h264;
+   } picture;
+   h264d_stream_info_t stream_info;
+   unsigned num_in_buffers;
+   bool first_buf_in_frame;
+   bool frame_finished;
+   bool frame_started;
+   unsigned bytes_left;
+   const void *slice;
+   bool disable_tunnel;
+   struct vl_compositor compositor;
+   struct vl_compositor_state cstate;
+   bool use_eglimage;
+};
+
+#endif
+
+void vid_dec_NeedTarget(vid_dec_PrivateType* priv);
+void vid_dec_FillOutput(vid_dec_PrivateType* priv, struct pipe_video_buffer* buf,
+                        OMX_BUFFERHEADERTYPE* output);
 #endif

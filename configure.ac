@@ -1364,6 +1364,11 @@ if test "x$enable_opengl" = xno -a \
     AC_MSG_ERROR([at least one API should be enabled])
 fi
 
+if test "x$enable_omx_bellagio" = xyes -a \
+        "x$enable_omx_tizonia" = xyes; then
+   AC_MSG_ERROR([Can't enable both bellagio and tizonia at same time])
+fi
+
 # Building OpenGL ES1 and/or ES2 without OpenGL is not supported on mesa 9.0.x
 if test "x$enable_opengl" = xno -a \
         "x$enable_gles1" = xyes; then
@@ -2260,6 +2265,7 @@ if test "x$enable_omx_bellagio" = xyes; then
     fi
     PKG_CHECK_MODULES([OMX_BELLAGIO], [libomxil-bellagio >= $LIBOMXIL_BELLAGIO_REQUIRED])
     gallium_st="$gallium_st omx_bellagio"
+    AC_DEFINE([ENABLE_ST_OMX_BELLAGIO], 1, [Use Bellagio for OMX IL])
 fi
 AM_CONDITIONAL(HAVE_ST_OMX_BELLAGIO, test "x$enable_omx_bellagio" = xyes)
 
@@ -2272,6 +2278,7 @@ if test "x$enable_omx_tizonia" = xyes; then
                        tizilheaders >= $LIBOMXIL_TIZONIA_REQUIRED
                        libtizplatform >= $LIBOMXIL_TIZONIA_REQUIRED])
     gallium_st="$gallium_st omx_tizonia"
+    AC_DEFINE([ENABLE_ST_OMX_TIZONIA], 1, [Use Tizoina for OMX IL])
 fi
 AM_CONDITIONAL(HAVE_ST_OMX_TIZONIA, test "x$enable_omx_tizonia" = xyes)
 
@@ -2978,8 +2985,9 @@ AC_CONFIG_FILES([Makefile
                  src/gallium/state_trackers/dri/Makefile
                  src/gallium/state_trackers/glx/xlib/Makefile
                  src/gallium/state_trackers/nine/Makefile
-                 src/gallium/state_trackers/omx_bellagio/Makefile
-                 src/gallium/state_trackers/omx_tizonia/Makefile
+                 src/gallium/state_trackers/omx/Makefile
+                 src/gallium/state_trackers/omx/bellagio/Makefile
+                 src/gallium/state_trackers/omx/tizonia/Makefile
                  src/gallium/state_trackers/osmesa/Makefile
                  src/gallium/state_trackers/va/Makefile
                  src/gallium/state_trackers/vdpau/Makefile
@@ -2990,8 +2998,7 @@ AC_CONFIG_FILES([Makefile
                  src/gallium/targets/d3dadapter9/d3d.pc
                  src/gallium/targets/dri/Makefile
                  src/gallium/targets/libgl-xlib/Makefile
-                 src/gallium/targets/omx-bellagio/Makefile
-                 src/gallium/targets/omx-tizonia/Makefile
+                 src/gallium/targets/omx/Makefile
                  src/gallium/targets/opencl/Makefile
                  src/gallium/targets/opencl/mesa.icd
                  src/gallium/targets/osmesa/Makefile

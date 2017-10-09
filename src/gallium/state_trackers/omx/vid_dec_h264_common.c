@@ -25,78 +25,13 @@
  *
  **************************************************************************/
 
-/*
- * Authors:
- *      Christian König <christian.koenig@amd.com>
- *
- */
+#if ENABLE_ST_OMX_TIZONIA
+#include <tizkernel.h>
+#endif
 
-#include "pipe/p_video_codec.h"
 #include "util/u_memory.h"
-#include "util/u_video.h"
-#include "vl/vl_rbsp.h"
-#include "vl/vl_zscan.h"
 
-#include "entrypoint.h"
-#include "vid_dec.h"
-
-#define DPB_MAX_SIZE 5
-
-struct dpb_list {
-   struct list_head list;
-   struct pipe_video_buffer *buffer;
-   OMX_TICKS timestamp;
-   int poc;
-};
-
-static const uint8_t Default_4x4_Intra[16] = {
-    6, 13, 20, 28, 13, 20, 28, 32,
-   20, 28, 32, 37, 28, 32, 37, 42
-};
-
-static const uint8_t Default_4x4_Inter[16] = {
-   10, 14, 20, 24, 14, 20, 24, 27,
-   20, 24, 27, 30, 24, 27, 30, 34
-};
-
-static const uint8_t Default_8x8_Intra[64] = {
-    6, 10, 13, 16, 18, 23, 25, 27,
-   10, 11, 16, 18, 23, 25, 27, 29,
-   13, 16, 18, 23, 25, 27, 29, 31,
-   16, 18, 23, 25, 27, 29, 31, 33,
-   18, 23, 25, 27, 29, 31, 33, 36,
-   23, 25, 27, 29, 31, 33, 36, 38,
-   25, 27, 29, 31, 33, 36, 38, 40,
-   27, 29, 31, 33, 36, 38, 40, 42
-};
-
-static const uint8_t Default_8x8_Inter[64] = {
-    9, 13, 15, 17, 19, 21, 22, 24,
-   13, 13, 17, 19, 21, 22, 24, 25,
-   15, 17, 19, 21, 22, 24, 25, 27,
-   17, 19, 21, 22, 24, 25, 27, 28,
-   19, 21, 22, 24, 25, 27, 28, 30,
-   21, 22, 24, 25, 27, 28, 30, 32,
-   22, 24, 25, 27, 28, 30, 32, 33,
-   24, 25, 27, 28, 30, 32, 33, 35
-};
-
-static void vid_dec_h264_Decode(vid_dec_PrivateType *priv, struct vl_vlc *vlc, unsigned min_bits_left);
-static void vid_dec_h264_EndFrame(vid_dec_PrivateType *priv);
-static struct pipe_video_buffer *vid_dec_h264_Flush(vid_dec_PrivateType *priv, OMX_TICKS *timestamp);
-
-void vid_dec_h264_Init(vid_dec_PrivateType *priv)
-{
-   priv->picture.base.profile = PIPE_VIDEO_PROFILE_MPEG4_AVC_HIGH;
-
-   priv->Decode = vid_dec_h264_Decode;
-   priv->EndFrame = vid_dec_h264_EndFrame;
-   priv->Flush = vid_dec_h264_Flush;
-
-   LIST_INITHEAD(&priv->codec_data.h264.dpb_list);
-   priv->picture.h264.field_order_cnt[0] = priv->picture.h264.field_order_cnt[1] = INT_MAX;
-   priv->first_buf_in_frame = true;
-}
+#include "vid_dec_h264_common.h"
 
 static void vid_dec_h264_BeginFrame(vid_dec_PrivateType *priv)
 {
@@ -107,16 +42,20 @@ static void vid_dec_h264_BeginFrame(vid_dec_PrivateType *priv)
 
    if (!priv->codec) {
       struct pipe_video_codec templat = {};
-      omx_base_video_PortType *port;
-
-      port = (omx_base_video_PortType *)priv->ports[OMX_BASE_FILTER_INPUTPORT_INDEX];
       templat.profile = priv->profile;
       templat.entrypoint = PIPE_VIDEO_ENTRYPOINT_BITSTREAM;
       templat.chroma_format = PIPE_VIDEO_CHROMA_FORMAT_420;
       templat.max_references = priv->picture.h264.num_ref_frames;
       templat.expect_chunked_decode = true;
+#if ENABLE_ST_OMX_BELLAGIO
+      omx_base_video_PortType *port;
+      port = (omx_base_video_PortType *)priv->ports[OMX_BASE_FILTER_INPUTPORT_INDEX];
       templat.width = port->sPortParam.format.video.nFrameWidth;
       templat.height = port->sPortParam.format.video.nFrameHeight;
+#else
+      templat.width = priv->out_port_def_.format.video.nFrameWidth;
+      templat.height = priv->out_port_def_.format.video.nFrameHeight;
+#endif
       templat.level = priv->picture.h264.pps->sps->level_idc;
 
       priv->codec = priv->pipe->create_video_codec(priv->pipe, &templat);
@@ -135,8 +74,8 @@ static void vid_dec_h264_BeginFrame(vid_dec_PrivateType *priv)
    priv->frame_started = true;
 }
 
-static struct pipe_video_buffer *vid_dec_h264_Flush(vid_dec_PrivateType *priv,
-                                                    OMX_TICKS *timestamp)
+struct pipe_video_buffer *vid_dec_h264_Flush(vid_dec_PrivateType *priv,
+                                             OMX_TICKS *timestamp)
 {
    struct dpb_list *entry, *result = NULL;
    struct pipe_video_buffer *buf;
@@ -165,7 +104,7 @@ static struct pipe_video_buffer *vid_dec_h264_Flush(vid_dec_PrivateType *priv,
    return buf;
 }
 
-static void vid_dec_h264_EndFrame(vid_dec_PrivateType *priv)
+void vid_dec_h264_EndFrame(vid_dec_PrivateType *priv)
 {
    struct dpb_list *entry;
    struct pipe_video_buffer *tmp;
@@ -364,10 +303,12 @@ static void seq_parameter_set(vid_dec_PrivateType *priv, struct vl_rbsp *rbsp)
    vl_rbsp_u(rbsp, 1);
 
    /* pic_width_in_mbs_minus1 */
-   vl_rbsp_ue(rbsp);
+   int pic_width_in_samplesl = (vl_rbsp_ue(rbsp) + 1) * 16;
+   assert(pic_width_in_samplesl);
 
    /* pic_height_in_map_units_minus1 */
-   vl_rbsp_ue(rbsp);
+   int pic_height_in_map_units = vl_rbsp_ue(rbsp) + 1;
+   assert(pic_height_in_map_units);
 
    sps->frame_mbs_only_flag = vl_rbsp_u(rbsp, 1);
    if (!sps->frame_mbs_only_flag)
@@ -375,6 +316,26 @@ static void seq_parameter_set(vid_dec_PrivateType *priv, struct vl_rbsp *rbsp)
 
    sps->direct_8x8_inference_flag = vl_rbsp_u(rbsp, 1);
 
+#if ENABLE_ST_OMX_TIZONIA
+   priv->stream_info.width = pic_width_in_samplesl;
+
+   int frame_height_in_mbs = (2 - sps->frame_mbs_only_flag) * pic_height_in_map_units;
+   int pic_height_in_mbs = frame_height_in_mbs / ( 1 + priv->picture.h264.field_pic_flag );
+   int pic_height_in_samplesl = pic_height_in_mbs * 16;
+   priv->stream_info.height = pic_height_in_samplesl;
+
+
+   /* frame_cropping_flag */
+   if (vl_rbsp_u(rbsp, 1)) {
+      unsigned frame_crop_left_offset = vl_rbsp_ue(rbsp);
+      unsigned frame_crop_right_offset = vl_rbsp_ue(rbsp);
+      unsigned frame_crop_top_offset = vl_rbsp_ue(rbsp);
+      unsigned frame_crop_bottom_offset = vl_rbsp_ue(rbsp);
+
+      priv->stream_info.width -= (frame_crop_left_offset + frame_crop_right_offset) * 2;
+      priv->stream_info.height -= (frame_crop_top_offset + frame_crop_bottom_offset) * 2;
+   }
+#else
    /* frame_cropping_flag */
    if (vl_rbsp_u(rbsp, 1)) {
       /* frame_crop_left_offset */
@@ -389,6 +350,7 @@ static void seq_parameter_set(vid_dec_PrivateType *priv, struct vl_rbsp *rbsp)
       /* frame_crop_bottom_offset */
       vl_rbsp_ue(rbsp);
    }
+#endif
 
    /* vui_parameters_present_flag */
    if (vl_rbsp_u(rbsp, 1))
@@ -679,10 +641,12 @@ static void slice_header(vid_dec_PrivateType *priv, struct vl_rbsp *rbsp,
 
    slice_type = vl_rbsp_ue(rbsp) % 5;
 
+   /* get picture parameter set */
    pps = pic_parameter_set_id(priv, rbsp);
    if (!pps)
       return;
 
+   /* get sequence parameter set */
    sps = pps->sps;
    if (!sps)
       return;
@@ -696,6 +660,7 @@ static void slice_header(vid_dec_PrivateType *priv, struct vl_rbsp *rbsp,
       /* colour_plane_id */
       vl_rbsp_u(rbsp, 2);
 
+   /* frame number handling */
    frame_num = vl_rbsp_u(rbsp, sps->log2_max_frame_num_minus4 + 4);
 
    if (frame_num != priv->picture.h264.frame_num)
@@ -726,6 +691,7 @@ static void slice_header(vid_dec_PrivateType *priv, struct vl_rbsp *rbsp,
    }
 
    if (IdrPicFlag) {
+      /* set idr_pic_id */
       unsigned idr_pic_id = vl_rbsp_ue(rbsp);
 
       if (idr_pic_id != priv->codec_data.h264.idr_pic_id)
@@ -735,6 +701,7 @@ static void slice_header(vid_dec_PrivateType *priv, struct vl_rbsp *rbsp,
    }
 
    if (sps->pic_order_cnt_type == 0) {
+      /* pic_order_cnt_lsb */
       unsigned log2_max_pic_order_cnt_lsb = sps->log2_max_pic_order_cnt_lsb_minus4 + 4;
       unsigned max_pic_order_cnt_lsb = 1 << log2_max_pic_order_cnt_lsb;
       int pic_order_cnt_lsb = vl_rbsp_u(rbsp, log2_max_pic_order_cnt_lsb);
@@ -763,6 +730,7 @@ static void slice_header(vid_dec_PrivateType *priv, struct vl_rbsp *rbsp,
       priv->codec_data.h264.pic_order_cnt_lsb = pic_order_cnt_lsb;
 
       if (pps->bottom_field_pic_order_in_frame_present_flag && !priv->picture.h264.field_pic_flag) {
+         /* delta_pic_oreder_cnt_bottom */
          unsigned delta_pic_order_cnt_bottom = vl_rbsp_se(rbsp);
 
          if (delta_pic_order_cnt_bottom != priv->codec_data.h264.delta_pic_order_cnt_bottom)
@@ -781,6 +749,7 @@ static void slice_header(vid_dec_PrivateType *priv, struct vl_rbsp *rbsp,
          priv->picture.h264.field_order_cnt[1] = pic_order_cnt_msb + pic_order_cnt_lsb;
 
    } else if (sps->pic_order_cnt_type == 1) {
+      /* delta_pic_order_cnt[0] */
       unsigned MaxFrameNum = 1 << (sps->log2_max_frame_num_minus4 + 4);
       unsigned FrameNumOffset, absFrameNum, expectedPicOrderCnt;
 
@@ -795,6 +764,7 @@ static void slice_header(vid_dec_PrivateType *priv, struct vl_rbsp *rbsp,
          priv->codec_data.h264.delta_pic_order_cnt[0] = delta_pic_order_cnt[0];
 
          if (pps->bottom_field_pic_order_in_frame_present_flag && !priv->picture.h264.field_pic_flag) {
+            /* delta_pic_order_cnt[1] */
             delta_pic_order_cnt[1] = vl_rbsp_se(rbsp);
 
             if (delta_pic_order_cnt[1] != priv->codec_data.h264.delta_pic_order_cnt[1])
@@ -950,7 +920,49 @@ static void slice_header(vid_dec_PrivateType *priv, struct vl_rbsp *rbsp,
       vl_rbsp_u(rbsp, 2);
 }
 
-static void vid_dec_h264_Decode(vid_dec_PrivateType *priv, struct vl_vlc *vlc, unsigned min_bits_left)
+#if ENABLE_ST_OMX_TIZONIA
+static OMX_ERRORTYPE update_port_parameters(vid_dec_PrivateType* priv) {
+   OMX_VIDEO_PORTDEFINITIONTYPE * p_def = NULL;   /* Output port info */
+   h264d_stream_info_t * i_def = NULL; /* Info read from stream */
+   OMX_ERRORTYPE err = OMX_ErrorNone;
+
+   assert(priv);
+
+   p_def = &(priv->out_port_def_.format.video);
+   i_def = &(priv->stream_info);
+
+   /* Handle dynamic resolution change */
+   if ((p_def->nFrameWidth == i_def->width) && p_def->nFrameHeight == i_def->height)
+      return err;
+
+   p_def->nFrameWidth = i_def->width;
+   p_def->nFrameHeight = i_def->height;
+   p_def->nStride = i_def->width;
+   p_def->nSliceHeight = i_def->height;
+
+   err = tiz_krn_SetParameter_internal(tiz_get_krn(handleOf(priv)), handleOf(priv),
+                                       OMX_IndexParamPortDefinition, &(priv->out_port_def_));
+   if (err == OMX_ErrorNone) {
+      tiz_port_t * p_obj = tiz_krn_get_port(tiz_get_krn(handleOf(priv)), OMX_VID_DEC_AVC_INPUT_PORT_INDEX);
+
+      /* Set desired buffer size that will be used when allocating input buffers */
+      p_obj->portdef_.nBufferSize = p_def->nFrameWidth * p_def->nFrameHeight * 512 / (16*16);
+
+      /* Get a locally copy of port def. Useful for the early return above */
+      tiz_check_omx(tiz_api_GetParameter(tiz_get_krn(handleOf(priv)), handleOf(priv),
+                                         OMX_IndexParamPortDefinition, &(priv->out_port_def_)));
+
+      tiz_srv_issue_event((OMX_PTR) priv, OMX_EventPortSettingsChanged,
+                          OMX_VID_DEC_AVC_OUTPUT_PORT_INDEX,
+                          OMX_IndexParamPortDefinition,
+                          NULL);
+   }
+
+   return err;
+}
+#endif
+
+void vid_dec_h264_Decode(vid_dec_PrivateType *priv, struct vl_vlc *vlc, unsigned min_bits_left)
 {
    unsigned nal_ref_idc, nal_unit_type;
 
@@ -992,6 +1004,9 @@ static void vid_dec_h264_Decode(vid_dec_PrivateType *priv, struct vl_vlc *vlc, u
       struct vl_rbsp rbsp;
       vl_rbsp_init(&rbsp, vlc, ~0);
       seq_parameter_set(priv, &rbsp);
+#if ENABLE_ST_OMX_TIZONIA
+      update_port_parameters(priv);
+#endif
 
    } else if (nal_unit_type == 8) {
       struct vl_rbsp rbsp;
@@ -1029,4 +1044,95 @@ static void vid_dec_h264_Decode(vid_dec_PrivateType *priv, struct vl_vlc *vlc, u
 
    /* resync to byte boundary */
    vl_vlc_eatbits(vlc, vl_vlc_valid_bits(vlc) % 8);
+}
+
+void vid_dec_FreeInputPortPrivate(OMX_BUFFERHEADERTYPE *buf)
+{
+   struct pipe_video_buffer *vbuf = buf->pInputPortPrivate;
+   if (!vbuf)
+      return;
+
+   vbuf->destroy(vbuf);
+   buf->pInputPortPrivate = NULL;
+}
+
+void vid_dec_FrameDecoded_common(vid_dec_PrivateType* priv, OMX_BUFFERHEADERTYPE* input,
+                          OMX_BUFFERHEADERTYPE* output)
+{
+#if ENABLE_ST_OMX_BELLAGIO
+   bool eos = !!(input->nFlags & OMX_BUFFERFLAG_EOS);
+#else
+   bool eos = priv->eos_;
+#endif
+   OMX_TICKS timestamp;
+
+   if (!input->pInputPortPrivate) {
+#if ENABLE_ST_OMX_BELLAGIO
+      input->pInputPortPrivate = priv->Flush(priv, &timestamp);
+#else
+      input->pInputPortPrivate = vid_dec_h264_Flush(priv, &timestamp);
+#endif
+      if (timestamp != OMX_VID_DEC_AVC_TIMESTAMP_INVALID)
+         input->nTimeStamp = timestamp;
+   }
+
+   if (input->pInputPortPrivate) {
+      if (output->pInputPortPrivate && !priv->disable_tunnel) {
+         struct pipe_video_buffer *tmp, *vbuf, *new_vbuf;
+
+         tmp = output->pOutputPortPrivate;
+         vbuf = input->pInputPortPrivate;
+         if (vbuf->interlaced) {
+            /* re-allocate the progressive buffer */
+            struct pipe_video_buffer templat = {};
+            struct u_rect src_rect, dst_rect;
+
+#if ENABLE_ST_OMX_BELLAGIO
+            omx_base_video_PortType *port;
+            port = (omx_base_video_PortType *)
+                    priv->ports[OMX_BASE_FILTER_INPUTPORT_INDEX];
+#else
+            tiz_port_t *port;
+            port = tiz_krn_get_port(tiz_get_krn(handleOf (priv)), OMX_VID_DEC_AVC_INPUT_PORT_INDEX);
+#endif
+            memset(&templat, 0, sizeof(templat));
+            templat.chroma_format = PIPE_VIDEO_CHROMA_FORMAT_420;
+#if ENABLE_ST_OMX_BELLAGIO
+            templat.width = port->sPortParam.format.video.nFrameWidth;
+            templat.height = port->sPortParam.format.video.nFrameHeight;
+#else
+            templat.width = port->portdef_.format.video.nFrameWidth;
+            templat.height = port->portdef_.format.video.nFrameHeight;
+#endif
+            templat.buffer_format = PIPE_FORMAT_NV12;
+            templat.interlaced = false;
+            new_vbuf = priv->pipe->create_video_buffer(priv->pipe, &templat);
+
+            /* convert the interlaced to the progressive */
+            src_rect.x0 = dst_rect.x0 = 0;
+            src_rect.x1 = dst_rect.x1 = templat.width;
+            src_rect.y0 = dst_rect.y0 = 0;
+            src_rect.y1 = dst_rect.y1 = templat.height;
+
+            vl_compositor_yuv_deint_full(&priv->cstate, &priv->compositor,
+                                         input->pInputPortPrivate, new_vbuf,
+                                         &src_rect, &dst_rect, VL_COMPOSITOR_WEAVE);
+
+            /* set the progrssive buffer for next round */
+            vbuf->destroy(vbuf);
+            input->pInputPortPrivate = new_vbuf;
+         }
+         output->pOutputPortPrivate = input->pInputPortPrivate;
+         input->pInputPortPrivate = tmp;
+      } else {
+         vid_dec_FillOutput(priv, input->pInputPortPrivate, output);
+      }
+      output->nFilledLen = output->nAllocLen;
+      output->nTimeStamp = input->nTimeStamp;
+   }
+
+   if (eos && input->pInputPortPrivate)
+      vid_dec_FreeInputPortPrivate(input);
+   else
+      input->nFilledLen = 0;
 }

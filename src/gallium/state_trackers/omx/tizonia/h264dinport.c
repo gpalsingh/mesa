@@ -37,7 +37,7 @@
 #include "h264d.h"
 #include "h264dinport.h"
 #include "h264dinport_decls.h"
-#include "h264dprc_decls.h"
+#include "vid_dec_common.h"
 
 /*
  * h264dinport class
@@ -67,7 +67,7 @@ static OMX_ERRORTYPE h264d_inport_SetParameter(const void * ap_obj, OMX_HANDLETY
    assert(ap_struct);
 
    if (a_index == OMX_IndexParamPortDefinition) {
-      h264d_prc_t * p_prc = tiz_get_prc(ap_hdl);
+      vid_dec_PrivateType * p_prc = tiz_get_prc(ap_hdl);
       OMX_VIDEO_PORTDEFINITIONTYPE * p_def = &(p_prc->out_port_def_.format.video);
       OMX_PARAM_PORTDEFINITIONTYPE * i_def = (OMX_PARAM_PORTDEFINITIONTYPE *) ap_struct;
 
