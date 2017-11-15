@@ -27,6 +27,7 @@
 #include "h264eprc.h"
 #include "h264e.h"
 #include "names.h"
+#include "vid_enc_common.h"
 
 static OMX_VERSIONTYPE h264e_encoder_version = {{0, 0, 0, 1}};
 

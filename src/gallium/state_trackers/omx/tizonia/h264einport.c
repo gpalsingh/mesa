@@ -37,7 +37,7 @@
 #include "h264e.h"
 #include "h264einport.h"
 #include "h264einport_decls.h"
-#include "h264e_common.h"
+#include "vid_enc_common.h"
 
 static OMX_ERRORTYPE enc_AllocateBackTexture(OMX_HANDLETYPE ap_hdl,
                                              OMX_U32 idx,
@@ -45,7 +45,7 @@ static OMX_ERRORTYPE enc_AllocateBackTexture(OMX_HANDLETYPE ap_hdl,
                                              struct pipe_transfer **transfer,
                                              OMX_U8 **map)
 {
-   h264e_prc_t * p_prc = tiz_get_prc(ap_hdl);
+   vid_enc_PrivateType * priv = tiz_get_prc(ap_hdl);
    tiz_port_t * port = tiz_krn_get_port(tiz_get_krn(ap_hdl), idx);
    struct pipe_resource buf_templ;
    struct pipe_box box = {};
@@ -62,14 +62,14 @@ static OMX_ERRORTYPE enc_AllocateBackTexture(OMX_HANDLETYPE ap_hdl,
    buf_templ.depth0 = 1;
    buf_templ.array_size = 1;
 
-   *resource = p_prc->s_pipe->screen->resource_create(p_prc->s_pipe->screen, &buf_templ);
+   *resource = priv->s_pipe->screen->resource_create(priv->s_pipe->screen, &buf_templ);
    if (!*resource)
       return OMX_ErrorInsufficientResources;
 
    box.width = (*resource)->width0;
    box.height = (*resource)->height0;
    box.depth = (*resource)->depth0;
-   ptr = p_prc->s_pipe->transfer_map(p_prc->s_pipe, *resource, 0, PIPE_TRANSFER_WRITE, &box, transfer);
+   ptr = priv->s_pipe->transfer_map(priv->s_pipe, *resource, 0, PIPE_TRANSFER_WRITE, &box, transfer);
    if (map)
       *map = ptr;
 
@@ -151,13 +151,13 @@ static OMX_ERRORTYPE h264e_inport_UseBuffer(const void * ap_obj, OMX_HANDLETYPE 
 static OMX_ERRORTYPE h264e_inport_FreeBuffer(const void * ap_obj, OMX_HANDLETYPE ap_hdl,
                                              OMX_U32 idx, OMX_BUFFERHEADERTYPE *buf)
 {
-   h264e_prc_t *p_prc = tiz_get_prc(ap_hdl);
+   vid_enc_PrivateType *priv = tiz_get_prc(ap_hdl);
    struct input_buf_private *inp = buf->pInputPortPrivate;
 
    if (inp) {
      enc_ReleaseTasks(&inp->tasks);
      if (inp->transfer)
-       pipe_transfer_unmap(p_prc->s_pipe, inp->transfer);
+       pipe_transfer_unmap(priv->s_pipe, inp->transfer);
      pipe_resource_reference(&inp->resource, NULL);
      FREE(inp);
    }

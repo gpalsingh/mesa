@@ -35,7 +35,7 @@
 
 #include "h264eoutport.h"
 #include "h264eoutport_decls.h"
-#include "h264e_common.h"
+#include "vid_enc_common.h"
 
 /*
  * h264eoutport class
@@ -79,12 +79,12 @@ static OMX_ERRORTYPE h264e_outport_AllocateBuffer(const void * ap_obj, OMX_HANDL
 static OMX_ERRORTYPE h264e_outport_FreeBuffer(const void * ap_obj, OMX_HANDLETYPE ap_hdl,
                                               OMX_U32 idx, OMX_BUFFERHEADERTYPE *buf)
 {
-   h264e_prc_t *p_prc = tiz_get_prc(ap_hdl);
+   vid_enc_PrivateType *priv = tiz_get_prc(ap_hdl);
    struct output_buf_private *outp = buf->pOutputPortPrivate;
 
    if (outp) {
       if (outp->transfer)
-         pipe_transfer_unmap(p_prc->t_pipe, outp->transfer);
+         pipe_transfer_unmap(priv->t_pipe, outp->transfer);
       pipe_resource_reference(&outp->bitstream, NULL);
       FREE(outp);
       buf->pOutputPortPrivate = NULL;
