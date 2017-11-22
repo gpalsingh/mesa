@@ -117,6 +117,9 @@ ENDCLASS(vid_dec_PrivateType)
 #include <tizprc_decls.h>
 #include <tizport_decls.h>
 
+#include "util/list.h"
+#include "util/u_hash_table.h"
+
 #include "pipe/p_video_state.h"
 
 typedef struct h264d_prc_class h264d_prc_class_t;
